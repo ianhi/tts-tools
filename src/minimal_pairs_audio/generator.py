@@ -13,6 +13,8 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
 from rich.table import Table
 from rich import box
+from pydub import AudioSegment
+import numpy as np
 
 from .utils import load_minimal_pairs_data, get_unique_words, ensure_directory_exists
 
@@ -103,34 +105,52 @@ def synthesize_raw_audio(
     effects_profile_id: str = "headphone-class-device",
     voice_name: str = "bn-IN-Chirp3-HD-Aoede",
     language_code: str = "bn-IN",
+    timeout: int = 30
 ) -> Tuple[int, Any]:
     """Synthesize speech from Google TTS and return audio data."""
-    client = texttospeech.TextToSpeechClient()
+    import signal
+    
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"TTS synthesis timed out after {timeout} seconds")
+    
+    # Set up timeout
+    if timeout > 0:
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout)
+    
+    try:
+        client = texttospeech.TextToSpeechClient()
 
-    input_text = texttospeech.SynthesisInput(text=text)
+        input_text = texttospeech.SynthesisInput(text=text)
 
-    voice = texttospeech.VoiceSelectionParams(
-        language_code=language_code,
-        name=voice_name,
-    )
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=language_code,
+            name=voice_name,
+        )
 
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.LINEAR16,
-        volume_gain_db=volume_gain_db,
-        effects_profile_id=[effects_profile_id] if effects_profile_id else [],
-    )
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.LINEAR16,  # Keep WAV for processing
+            sample_rate_hertz=44100,  # Standard sample rate for better browser compatibility
+            volume_gain_db=volume_gain_db,
+            effects_profile_id=[effects_profile_id] if effects_profile_id else [],
+        )
 
-    response = client.synthesize_speech(
-        request={
-            "input": input_text,
-            "voice": voice,
-            "audio_config": audio_config,
-        },
-    )
+        response = client.synthesize_speech(
+            request={
+                "input": input_text,
+                "voice": voice,
+                "audio_config": audio_config,
+            },
+        )
 
-    # Convert response to audio samples
-    sample_rate, samples = wavfile.read(io.BytesIO(response.audio_content))
-    return sample_rate, samples
+        # Convert response to audio samples for processing
+        sample_rate, samples = wavfile.read(io.BytesIO(response.audio_content))
+        return sample_rate, samples
+    
+    finally:
+        # Clear the alarm
+        if timeout > 0:
+            signal.alarm(0)
 
 
 def get_all_voice_names() -> Dict[str, List[str]]:
@@ -211,8 +231,8 @@ class AudioGenerator:
         # Get minimal voice name for filename
         minimal_voice_name = get_minimal_voice_name(voice_config['voice_name'])
         
-        # Create filename in tree structure: word/word_voicename.wav
-        output_filename = f"{transliteration}_{minimal_voice_name}.wav"
+        # Create filename in tree structure: word/word_voicename.mp3 (changed from .wav)
+        output_filename = f"{transliteration}_{minimal_voice_name}.mp3"
         output_file = word_dir / output_filename
 
         # Check if file already exists and skip if not overwriting
@@ -236,19 +256,38 @@ class AudioGenerator:
         # Retry logic for failed recordings
         for attempt in range(self.max_retries):
             try:
-                # Generate audio
+                # Generate audio with timeout
                 sample_rate, samples = synthesize_raw_audio(
                     text_with_stop,
                     volume_gain_db=voice_config["volume_gain_db"],
                     effects_profile_id=voice_config["effects_profile"],
                     voice_name=voice_config["voice_name"],
+                    timeout=30  # 30 second timeout to prevent hanging
                 )
 
                 # Trim silence from beginning and end only (preserve all speech content)
                 trimmed_samples = librosa.effects.trim(samples, top_db=30)[0]
                 
-                # Save processed audio file (preserves full speech content)
-                sf.write(str(output_file), trimmed_samples, sample_rate)
+                # Convert to 16-bit integers for pydub
+                if trimmed_samples.dtype != np.int16:
+                    # Normalize and convert to int16
+                    if trimmed_samples.dtype == np.float32 or trimmed_samples.dtype == np.float64:
+                        # Samples are in [-1, 1] range
+                        trimmed_samples = (trimmed_samples * 32767).astype(np.int16)
+                    else:
+                        # Samples might already be int16 or need different conversion
+                        trimmed_samples = trimmed_samples.astype(np.int16)
+                
+                # Create AudioSegment and export as MP3
+                audio_segment = AudioSegment(
+                    trimmed_samples.tobytes(),
+                    frame_rate=sample_rate,
+                    sample_width=2,  # 16-bit = 2 bytes
+                    channels=1  # mono
+                )
+                
+                # Export as MP3 with high quality
+                audio_segment.export(str(output_file), format="mp3", bitrate="192k")
                 
                 # Validate the generated audio file
                 validation = validate_audio_file(output_file, self.min_file_size, self.min_duration)
@@ -333,23 +372,42 @@ class AudioGenerator:
             TimeRemainingColumn(),
             console=console
         ) as progress:
-            task = progress.add_task("Generating audio...", total=total_words)
+            main_task = progress.add_task("Generating audio...", total=total_words)
+            voice_task = progress.add_task("", total=len(voices), visible=False)
             
-            for bengali_text, transliteration in unique_words:
+            for word_idx, (bengali_text, transliteration) in enumerate(unique_words):
                 word_results = []
                 
-                for voice_name in voices:
+                # Show detailed progress for each word
+                progress.update(main_task, 
+                    description=f"Processing {transliteration} ({bengali_text}) [{word_idx+1}/{total_words}]")
+                progress.update(voice_task, completed=0, total=len(voices), visible=True,
+                    description=f"Voices for {transliteration}")
+                
+                for voice_idx, voice_name in enumerate(voices):
+                    # Update voice-level progress
+                    minimal_voice = get_minimal_voice_name(voice_name)
+                    progress.update(voice_task, completed=voice_idx,
+                        description=f"Voice: {minimal_voice}")
+                    
                     voice_config = {
                         "voice_name": voice_name,
                         "volume_gain_db": volume_gain_db,
                         "effects_profile": effects_profile
                     }
                     
-                    result = self.process_word_recording(
-                        bengali_text, 
-                        transliteration, 
-                        voice_config
-                    )
+                    try:
+                        result = self.process_word_recording(
+                            bengali_text, 
+                            transliteration, 
+                            voice_config
+                        )
+                    except TimeoutError as e:
+                        console.print(f"[red]⏰ Timeout processing {transliteration} with {minimal_voice}: {e}[/red]")
+                        result = {"status": "failed", "reason": f"Timeout: {str(e)}"}
+                    except Exception as e:
+                        console.print(f"[red]❌ Error processing {transliteration} with {minimal_voice}: {e}[/red]")
+                        result = {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
                     
                     word_results.append(result)
                     
@@ -363,14 +421,19 @@ class AudioGenerator:
                     elif result["status"] == "regenerate":
                         results["regenerated"] += 1
                 
+                # Complete voice progress for this word
+                progress.update(voice_task, completed=len(voices))
+                
                 results["words"][transliteration] = {
                     "bengali": bengali_text,
                     "results": word_results
                 }
                 
-                # Update progress
-                progress.update(task, advance=1, 
-                    description=f"Processing {transliteration} ({bengali_text})")
+                # Update main progress
+                progress.update(main_task, advance=1)
+            
+            # Hide voice task when done
+            progress.update(voice_task, visible=False)
         
         # Print summary
         self._print_summary(results)
