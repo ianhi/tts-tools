@@ -1,0 +1,36 @@
+{
+  "name": "@minimal-pairs/audio-tools",
+  "version": "1.0.0",
+  "description": "Node.js wrapper for minimal pairs audio generation and verification tools",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "minimal-pairs-audio": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "audio",
+    "text-to-speech",
+    "language-learning",
+    "minimal-pairs",
+    "bengali",
+    "pronunciation"
+  ],
+  "author": "Ian",
+  "license": "MIT",
+  "dependencies": {
+    "execa": "^8.0.1"
+  },
+  "peerDependencies": {
+    "uv": "*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-repo/minimal-pairs.git"
+  }
+}
