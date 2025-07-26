@@ -10,6 +10,7 @@ from rich.table import Table
 from rich import box
 
 from .utils import ensure_directory_exists
+from .config import AudioToolsConfig
 
 
 console = Console()
@@ -18,17 +19,17 @@ console = Console()
 class ManifestGenerator:
     """Generate and manage audio file manifests."""
     
-    def __init__(self, audio_base_path: str = "public/audio/bn-IN"):
-        self.audio_base_path = Path(audio_base_path)
+    def __init__(self, config: AudioToolsConfig):
+        self.config = config
+        self.audio_base_path = self.config.base_audio_dir / self.config.language_code
     
     def generate_manifest(
         self, 
-        output_path: Optional[Path] = None,
-        include_stats: bool = True
+        output_path: Optional[Path] = None
     ) -> Dict[str, Any]:
         """Generate manifest of all audio files in the audio directory."""
         if output_path is None:
-            output_path = self.audio_base_path.parent / "audio_manifest.json"
+            output_path = self.config.base_audio_dir / f"audio_manifest_{self.config.language_code}.json"
         
         manifest = {"words": {}}
         stats = {
@@ -82,41 +83,7 @@ class ManifestGenerator:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(manifest, f, indent=2, ensure_ascii=False)
         
-        # Print summary
-        if include_stats:
-            self._print_summary(stats, output_path)
-        
         return manifest
-    
-    def _print_summary(self, stats: Dict[str, Any], output_path: Path) -> None:
-        """Print manifest generation summary."""
-        console.print(f"\n[bold green]Audio Manifest Generated![/bold green]")
-        console.print(f"Saved to: {output_path}")
-        
-        # Summary table
-        summary_table = Table(title="Manifest Summary", box=box.ROUNDED)
-        summary_table.add_column("Metric", style="cyan")
-        summary_table.add_column("Value", justify="right", style="magenta")
-        
-        summary_table.add_row("Total Words", str(stats["total_words"]))
-        summary_table.add_row("Total Audio Files", str(stats["total_files"]))
-        if stats["total_words"] > 0:
-            avg_files = stats["total_files"] / stats["total_words"]
-            summary_table.add_row("Avg Files per Word", f"{avg_files:.1f}")
-        
-        console.print(summary_table)
-        
-        # Files per word distribution
-        if stats["files_per_word"]:
-            dist_table = Table(title="Files per Word Distribution", box=box.SIMPLE)
-            dist_table.add_column("Files", justify="right", style="yellow")
-            dist_table.add_column("Words", justify="right", style="green")
-            
-            for num_files in sorted(stats["files_per_word"].keys()):
-                count = stats["files_per_word"][num_files]
-                dist_table.add_row(str(num_files), str(count))
-            
-            console.print(dist_table)
     
     def verify_manifest(
         self, 
@@ -125,7 +92,7 @@ class ManifestGenerator:
     ) -> Dict[str, Any]:
         """Verify that all files in manifest actually exist."""
         if manifest_path is None:
-            manifest_path = self.audio_base_path.parent / "audio_manifest.json"
+            manifest_path = self.config.base_audio_dir / f"audio_manifest_{self.config.language_code}.json"
         
         if not manifest_path.exists():
             console.print(f"[red]Manifest not found: {manifest_path}[/red]")
