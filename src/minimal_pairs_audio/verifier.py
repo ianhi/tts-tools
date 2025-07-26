@@ -11,8 +11,9 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRe
 from rich.table import Table
 from rich import box
 
-from .models import BengaliTextNormalizer, VerificationModel, GcpStandardModel, Chirp2Model
+from .models import BengaliTextNormalizer, SpanishTextNormalizer, TextNormalizer, VerificationModel, GcpStandardModel, Chirp2Model
 from .utils import load_minimal_pairs_data, load_audio_manifest
+from .config import AudioToolsConfig
 
 
 console = Console()
@@ -36,9 +37,20 @@ class VerificationResult:
 class PronunciationVerifier:
     """Verify pronunciation accuracy using speech-to-text models."""
 
-    def __init__(self, model: VerificationModel):
+    def __init__(self, model: VerificationModel, config: AudioToolsConfig):
         self.model = model
-        self.normalizer = BengaliTextNormalizer()
+        self.config = config
+        self.normalizer = self._get_normalizer(config.language_code)
+    
+    def _get_normalizer(self, language_code: str) -> TextNormalizer:
+        """Get the appropriate text normalizer for the language."""
+        if language_code.startswith("bn"):
+            return BengaliTextNormalizer()
+        elif language_code.startswith("es"):
+            return SpanishTextNormalizer()
+        else:
+            # Default to Bengali for backward compatibility
+            return BengaliTextNormalizer()
 
     def verify_audio_file(
         self, 
@@ -79,8 +91,8 @@ class PronunciationVerifier:
     ) -> Dict[str, Any]:
         """Verify all audio files in the manifest."""
         # Load data
-        pairs_data = load_minimal_pairs_data(pairs_data_path)
-        audio_manifest = load_audio_manifest(manifest_path)
+        pairs_data = load_minimal_pairs_data(pairs_data_path if pairs_data_path else self.config.pairs_file_path)
+        audio_manifest = load_audio_manifest(manifest_path, language_code=self.config.language_code)
 
         # Collect verification tasks
         verification_tasks = self._collect_verification_tasks(
@@ -138,8 +150,8 @@ class PronunciationVerifier:
     ) -> List[Dict[str, Any]]:
         """Collect all verification tasks based on filters."""
         tasks = []
-        bn_data = pairs_data.get("bn-IN", {})
-        types = bn_data.get("types", {})
+        lang_data = pairs_data.get(self.config.language_code, {})
+        types = lang_data.get("types", {})
 
         for category_name, category_data in types.items():
             if category and category_name != category:
@@ -159,7 +171,7 @@ class PronunciationVerifier:
                         extension = word_info.get("extension", "wav")
                         
                         for voice in voices:
-                            audio_file = f"public/audio/bn-IN/{transliteration}/{transliteration}_{voice}.{extension}"
+                            audio_file = f"{self.config.base_audio_dir}/{self.config.language_code}/{transliteration}/{transliteration}_{voice}.{extension}"
                             if Path(audio_file).exists():
                                 tasks.append({
                                     "audio_file": audio_file,
