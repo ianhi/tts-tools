@@ -60,7 +60,7 @@ def main(config: AudioToolsConfig, language):
     """Minimal Pairs Audio Tools - Generate and verify audio for language learning."""
     if not language: # If no language is provided via CLI
         # Dynamically discover language directories
-        base_audio_path = Path("public/audio")
+        base_audio_path = config.base_audio_dir
         if base_audio_path.exists():
             discovered_languages = [d.name for d in base_audio_path.iterdir() if d.is_dir() and '-' in d.name]
             if discovered_languages:
@@ -226,7 +226,7 @@ def full_pipeline(output_dir, overwrite, limit_voices, voice_type, volume_gain,
     console.print("[dim]This will: 1) Generate audio, 2) Create manifest, 3) Verify quality[/dim]\n")
     
     if output_dir is None:
-        output_dir = "public/audio"
+        output_dir = str(config.base_audio_dir)
 
     # Step 1: Generate Audio
     console.print("[bold blue]Step 1/3: 🎵 Generating audio files...[/bold blue]")
@@ -484,7 +484,7 @@ def generate_async(output_dir, overwrite, limit_voices, voice_type, volume_gain,
     console.print("[bold blue]🚀 Generating audio files with async processing...[/bold blue]")
     
     if output_dir is None:
-        output_dir = "public/audio"
+        output_dir = str(config.base_audio_dir)
 
     async def run_async_generation():
         generator = AsyncAudioGenerator(
