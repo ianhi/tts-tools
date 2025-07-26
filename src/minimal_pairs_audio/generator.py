@@ -17,6 +17,7 @@ from pydub import AudioSegment
 import numpy as np
 
 from .utils import load_minimal_pairs_data, get_unique_words, ensure_directory_exists
+from .config import AudioToolsConfig
 
 
 console = Console()
@@ -29,7 +30,7 @@ def get_minimal_voice_name(full_voice_name: str) -> str:
         'bn-IN-Chirp3-HD-Aoede' -> 'chirp3-hd-aoede'
     """
     parts = full_voice_name.split('-')
-    if len(parts) >= 3 and parts[0] == 'bn' and parts[1] == 'IN':
+    if len(parts) >= 3 and parts[0] == full_voice_name[:2].lower() and parts[1] == full_voice_name[3:5].lower():
         return '-'.join(parts[2:]).lower()
     return full_voice_name.lower()
 
@@ -108,90 +109,146 @@ def synthesize_raw_audio(
     timeout: int = 30
 ) -> Tuple[int, Any]:
     """Synthesize speech from Google TTS and return audio data."""
-    import signal
-    
-    def timeout_handler(signum, frame):
-        raise TimeoutError(f"TTS synthesis timed out after {timeout} seconds")
-    
-    # Set up timeout
-    if timeout > 0:
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(timeout)
-    
-    try:
-        client = texttospeech.TextToSpeechClient()
+    client = texttospeech.TextToSpeechClient()
 
-        input_text = texttospeech.SynthesisInput(text=text)
+    input_text = texttospeech.SynthesisInput(text=text)
 
-        voice = texttospeech.VoiceSelectionParams(
-            language_code=language_code,
-            name=voice_name,
-        )
+    voice = texttospeech.VoiceSelectionParams(
+        language_code=language_code,
+        name=voice_name,
+    )
 
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.LINEAR16,  # Keep WAV for processing
-            sample_rate_hertz=44100,  # Standard sample rate for better browser compatibility
-            volume_gain_db=volume_gain_db,
-            effects_profile_id=[effects_profile_id] if effects_profile_id else [],
-        )
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.LINEAR16,  # Keep WAV for processing
+        sample_rate_hertz=44100,  # Standard sample rate for better browser compatibility
+        volume_gain_db=volume_gain_db,
+        effects_profile_id=[effects_profile_id] if effects_profile_id else [],
+    )
 
-        response = client.synthesize_speech(
-            request={
-                "input": input_text,
-                "voice": voice,
-                "audio_config": audio_config,
-            },
-        )
+    # Use the timeout parameter in the API call
+    response = client.synthesize_speech(
+        request={
+            "input": input_text,
+            "voice": voice,
+            "audio_config": audio_config,
+        },
+        timeout=timeout if timeout > 0 else None
+    )
 
-        # Convert response to audio samples for processing
-        sample_rate, samples = wavfile.read(io.BytesIO(response.audio_content))
-        return sample_rate, samples
-    
-    finally:
-        # Clear the alarm
-        if timeout > 0:
-            signal.alarm(0)
+    # Convert response to audio samples for processing
+    sample_rate, samples = wavfile.read(io.BytesIO(response.audio_content))
+    return sample_rate, samples
 
 
-def get_all_voice_names() -> Dict[str, List[str]]:
-    """Get all available voice names for Bengali."""
-    return {
-        "chirp3_hd": [
-            "bn-IN-Chirp3-HD-Achernar",
-            "bn-IN-Chirp3-HD-Achird",
-            "bn-IN-Chirp3-HD-Algenib",
-            "bn-IN-Chirp3-HD-Algieba",
-            "bn-IN-Chirp3-HD-Alnilam",
-            "bn-IN-Chirp3-HD-Aoede",
-            "bn-IN-Chirp3-HD-Autonoe",
-            "bn-IN-Chirp3-HD-Callirrhoe",
-            "bn-IN-Chirp3-HD-Charon",
-            "bn-IN-Chirp3-HD-Despina",
-            "bn-IN-Chirp3-HD-Enceladus",
-            "bn-IN-Chirp3-HD-Erinome",
-            "bn-IN-Chirp3-HD-Fenrir",
-            "bn-IN-Chirp3-HD-Gacrux",
-            "bn-IN-Chirp3-HD-Iapetus",
-            "bn-IN-Chirp3-HD-Kore",
-            "bn-IN-Chirp3-HD-Laomedeia",
-            "bn-IN-Chirp3-HD-Leda",
-            "bn-IN-Chirp3-HD-Orus",
-            "bn-IN-Chirp3-HD-Puck",
-            "bn-IN-Chirp3-HD-Pulcherrima",
-            "bn-IN-Chirp3-HD-Rasalgethi",
-            "bn-IN-Chirp3-HD-Sadachbia",
-            "bn-IN-Chirp3-HD-Sadaltager",
-            "bn-IN-Chirp3-HD-Schedar",
-            "bn-IN-Chirp3-HD-Sulafat",
-            "bn-IN-Chirp3-HD-Umbriel",
-        ],
-        "wavenet": [
-            "bn-IN-Wavenet-A",  # Female
-            "bn-IN-Wavenet-B",  # Male
-            "bn-IN-Wavenet-C",  # Female
-            "bn-IN-Wavenet-D",  # Male
-        ]
-    }
+def get_all_voice_names(language_code: str = "bn-IN") -> Dict[str, List[str]]:
+    """Get all available voice names for the specified language."""
+    if language_code == "bn-IN":
+        return {
+            "chirp3_hd": [
+                "bn-IN-Chirp3-HD-Achernar",
+                "bn-IN-Chirp3-HD-Achird",
+                "bn-IN-Chirp3-HD-Algenib",
+                "bn-IN-Chirp3-HD-Algieba",
+                "bn-IN-Chirp3-HD-Alnilam",
+                "bn-IN-Chirp3-HD-Aoede",
+                "bn-IN-Chirp3-HD-Autonoe",
+                "bn-IN-Chirp3-HD-Callirrhoe",
+                "bn-IN-Chirp3-HD-Charon",
+                "bn-IN-Chirp3-HD-Despina",
+                "bn-IN-Chirp3-HD-Enceladus",
+                "bn-IN-Chirp3-HD-Erinome",
+                "bn-IN-Chirp3-HD-Fenrir",
+                "bn-IN-Chirp3-HD-Gacrux",
+                "bn-IN-Chirp3-HD-Iapetus",
+                "bn-IN-Chirp3-HD-Kore",
+                "bn-IN-Chirp3-HD-Laomedeia",
+                "bn-IN-Chirp3-HD-Leda",
+                "bn-IN-Chirp3-HD-Orus",
+                "bn-IN-Chirp3-HD-Puck",
+                "bn-IN-Chirp3-HD-Pulcherrima",
+                "bn-IN-Chirp3-HD-Rasalgethi",
+                "bn-IN-Chirp3-HD-Sadachbia",
+                "bn-IN-Chirp3-HD-Sadaltager",
+                "bn-IN-Chirp3-HD-Schedar",
+                "bn-IN-Chirp3-HD-Sulafat",
+                "bn-IN-Chirp3-HD-Umbriel",
+            ],
+            "wavenet": [
+                "bn-IN-Wavenet-A",  # Female
+                "bn-IN-Wavenet-B",  # Male
+                "bn-IN-Wavenet-C",  # Female
+                "bn-IN-Wavenet-D",  # Male
+            ]
+        }
+    elif language_code == "es-US":
+        return {
+            "chirp_hd": [
+                "es-US-Chirp-HD-D",  # Male
+                "es-US-Chirp-HD-F",  # Female
+                "es-US-Chirp-HD-O",  # Female
+            ],
+            "chirp3_hd": [
+                "es-US-Chirp3-HD-Achernar",     # Female
+                "es-US-Chirp3-HD-Achird",       # Male
+                "es-US-Chirp3-HD-Algenib",      # Male
+                "es-US-Chirp3-HD-Algieba",      # Male
+                "es-US-Chirp3-HD-Alnilam",      # Male
+                "es-US-Chirp3-HD-Aoede",        # Female
+                "es-US-Chirp3-HD-Autonoe",      # Female
+                "es-US-Chirp3-HD-Callirrhoe",   # Female
+                "es-US-Chirp3-HD-Charon",       # Male
+                "es-US-Chirp3-HD-Despina",      # Female
+                "es-US-Chirp3-HD-Enceladus",    # Male
+                "es-US-Chirp3-HD-Erinome",      # Female
+                "es-US-Chirp3-HD-Fenrir",       # Male
+                "es-US-Chirp3-HD-Gacrux",       # Female
+                "es-US-Chirp3-HD-Iapetus",      # Male
+                "es-US-Chirp3-HD-Kore",         # Female
+                "es-US-Chirp3-HD-Laomedeia",    # Female
+                "es-US-Chirp3-HD-Leda",         # Female
+                "es-US-Chirp3-HD-Orus",         # Male
+                "es-US-Chirp3-HD-Puck",         # Male
+                "es-US-Chirp3-HD-Pulcherrima",  # Female
+                "es-US-Chirp3-HD-Rasalgethi",   # Male
+                "es-US-Chirp3-HD-Sadachbia",    # Male
+                "es-US-Chirp3-HD-Sadaltager",   # Male
+                "es-US-Chirp3-HD-Schedar",      # Male
+                "es-US-Chirp3-HD-Sulafat",      # Female
+                "es-US-Chirp3-HD-Umbriel",      # Male
+                "es-US-Chirp3-HD-Vindemiatrix", # Female
+                "es-US-Chirp3-HD-Zephyr",       # Female
+                "es-US-Chirp3-HD-Zubenelgenubi", # Male
+            ],
+            "neural2": [
+                "es-US-Neural2-A",  # Female
+                "es-US-Neural2-B",  # Male
+                "es-US-Neural2-C",  # Male
+            ],
+            "news": [
+                "es-US-News-D",  # Male
+                "es-US-News-E",  # Male
+                "es-US-News-F",  # Female
+                "es-US-News-G",  # Female
+            ],
+            "polyglot": [
+                "es-US-Polyglot-1",  # Male
+            ],
+            "studio": [
+                "es-US-Studio-B",  # Male
+            ],
+            "wavenet": [
+                "es-US-Wavenet-A",  # Female
+                "es-US-Wavenet-B",  # Male
+                "es-US-Wavenet-C",  # Male
+            ],
+            "standard": [
+                "es-US-Standard-A",  # Female
+                "es-US-Standard-B",  # Male
+                "es-US-Standard-C",  # Male
+            ]
+        }
+    else:
+        raise ValueError(f"Unsupported language code: {language_code}")
 
 
 class AudioGenerator:
@@ -199,14 +256,15 @@ class AudioGenerator:
     
     def __init__(
         self,
-        base_output_path: str = "public/audio/bn-IN",
+        config: AudioToolsConfig,
         overwrite: bool = False,
         min_file_size: int = 5000,
         min_duration: float = 0.3,
         max_retries: int = 3,
-        limit_voices: Optional[int] = None
+        limit_voices: Optional[int] = None,
     ):
-        self.base_output_path = Path(base_output_path)
+        self.config = config
+        self.base_output_path = self.config.base_audio_dir / self.config.language_code
         self.overwrite = overwrite
         self.min_file_size = min_file_size
         self.min_duration = min_duration
@@ -221,8 +279,13 @@ class AudioGenerator:
         voice_config: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Process a single word recording and save to tree structure."""
-        # Add Bengali full stop for natural speech
-        text_with_stop = f"{word_text}।"
+        # Add appropriate punctuation for natural speech based on language
+        if self.config.language_code == "bn-IN":
+            text_with_stop = f"{word_text}।"  # Bengali full stop
+        elif self.config.language_code == "es-US":
+            text_with_stop = f"{word_text}."  # Spanish period
+        else:
+            text_with_stop = f"{word_text}."  # Default period
 
         # Create word-specific directory
         word_dir = self.base_output_path / transliteration
@@ -262,6 +325,7 @@ class AudioGenerator:
                     volume_gain_db=voice_config["volume_gain_db"],
                     effects_profile_id=voice_config["effects_profile"],
                     voice_name=voice_config["voice_name"],
+                    language_code=self.config.language_code,
                     timeout=30  # 30 second timeout to prevent hanging
                 )
 
@@ -332,17 +396,20 @@ class AudioGenerator:
     ) -> Dict[str, Any]:
         """Generate audio for all words in the minimal pairs database."""
         # Load data
-        pairs_data = load_minimal_pairs_data(pairs_data_path)
-        unique_words = get_unique_words(pairs_data)
+        pairs_data = load_minimal_pairs_data(pairs_data_path if pairs_data_path else self.config.pairs_file_path)
+        unique_words = get_unique_words(pairs_data, self.config.language_code)
         
         # Get voices based on type
-        all_voices = get_all_voice_names()
+        all_voices = get_all_voice_names(self.config.language_code)
         if voice_type == "chirp":
-            voices = all_voices["chirp3_hd"]
+            voices = all_voices.get("chirp3_hd", []) + all_voices.get("chirp_hd", [])
         elif voice_type == "wavenet":
-            voices = all_voices["wavenet"]
+            voices = all_voices.get("wavenet", [])
         else:
-            voices = all_voices["chirp3_hd"] + all_voices["wavenet"]
+            # Combine all voice types for the language
+            voices = []
+            for voice_list in all_voices.values():
+                voices.extend(voice_list)
         
         # Limit voices if requested
         if self.limit_voices:
