@@ -15,7 +15,10 @@ def load_minimal_pairs_data(json_path: Path = None) -> Dict[str, Any]:
         Dictionary containing minimal pairs data.
     """
     if json_path is None:
-        json_path = Path("public/minimal_pairs_db.json")
+        # Import here to avoid circular dependency
+        from .config import AudioToolsConfig
+        default_config = AudioToolsConfig()
+        json_path = default_config.pairs_file_path
     
     if not json_path.exists():
         raise FileNotFoundError(f"Minimal pairs data not found at {json_path}")
@@ -24,17 +27,21 @@ def load_minimal_pairs_data(json_path: Path = None) -> Dict[str, Any]:
         return json.load(f)
 
 
-def load_audio_manifest(manifest_path: Path = None) -> Dict[str, Any]:
+def load_audio_manifest(manifest_path: Path = None, language_code: str = "bn-IN") -> Dict[str, Any]:
     """Load audio manifest to get available audio files.
     
     Args:
         manifest_path: Path to manifest file. If None, uses default location.
+        language_code: Language code for the manifest file.
         
     Returns:
         Dictionary containing audio manifest data.
     """
     if manifest_path is None:
-        manifest_path = Path("public/audio/audio_manifest.json")
+        # Import here to avoid circular dependency
+        from .config import AudioToolsConfig
+        default_config = AudioToolsConfig()
+        manifest_path = default_config.base_audio_dir / f"audio_manifest_{language_code}.json"
     
     if not manifest_path.exists():
         raise FileNotFoundError(f"Audio manifest not found at {manifest_path}")
@@ -43,29 +50,37 @@ def load_audio_manifest(manifest_path: Path = None) -> Dict[str, Any]:
         return json.load(f)
 
 
-def get_unique_words(pairs_data: Dict[str, Any]) -> List[Tuple[str, str]]:
-    """Extract unique words from minimal pairs data.
+def get_unique_words(pairs_data: Dict[str, Any], language_code: str = "bn-IN") -> List[Tuple[str, str]]:
+    """Extract unique words from minimal pairs data for a specific language.
     
     Args:
         pairs_data: Minimal pairs data dictionary.
+        language_code: Language code to extract words for (e.g., "bn-IN", "es-ES").
         
     Returns:
-        List of (bengali_word, transliteration) tuples.
+        For languages with transliteration (like Bengali): List of (native_word, transliteration) tuples.
+        For languages without transliteration (like Spanish): List of (word, word) tuples.
     """
     unique_words = {}
-    bn_data = pairs_data.get("bn-IN", {})
-    types = bn_data.get("types", {})
+    lang_data = pairs_data.get(language_code, {})
+    types = lang_data.get("types", {})
     
     for category_data in types.values():
         pairs = category_data.get("pairs", [])
         for pair in pairs:
             for word_data in pair:
-                bengali_word, transliteration = word_data
-                # Only add if we haven't seen this transliteration before
-                if transliteration not in unique_words:
-                    unique_words[transliteration] = bengali_word
+                if len(word_data) == 2:
+                    # Language with transliteration (like Bengali)
+                    native_word, transliteration = word_data
+                    if transliteration not in unique_words:
+                        unique_words[transliteration] = native_word
+                elif len(word_data) == 1:
+                    # Language without transliteration (like Spanish)
+                    word = word_data[0]
+                    if word not in unique_words:
+                        unique_words[word] = word
     
-    return [(bengali, translit) for translit, bengali in unique_words.items()]
+    return [(native, key) for key, native in unique_words.items()]
 
 
 def get_google_cloud_project_id() -> str:
