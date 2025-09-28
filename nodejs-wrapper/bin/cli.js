@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 
 // Check if we're in development (running from source) or installed
 const isDevelopment = existsSync(path.join(__dirname, '../../src'));
-const audioToolsPath = isDevelopment 
+const audioToolsPath = isDevelopment
   ? path.join(__dirname, '../..')  // We're inside audio_tools/nodejs-wrapper/bin
   : path.join(__dirname, '../audio_tools');
 

@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 
 // Check if we're in development or installed
 const isDevelopment = existsSync(path.join(__dirname, '../src'));
-const audioToolsPath = isDevelopment 
+const audioToolsPath = isDevelopment
   ? path.join(__dirname, '..')  // Parent directory is the audio_tools root
   : path.join(__dirname, 'audio_tools');
 
@@ -73,7 +73,7 @@ class AudioTools {
    */
   async generate(options = {}) {
     const args = [];
-    
+
     if (options.outputDir) args.push('--output-dir', options.outputDir);
     if (options.overwrite) args.push('--overwrite');
     if (options.limitVoices) args.push('--limit-voices', options.limitVoices.toString());
@@ -89,7 +89,7 @@ class AudioTools {
    */
   async verify(options = {}) {
     const args = [];
-    
+
     if (options.model) args.push('--model', options.model);
     if (options.words) {
       options.words.forEach(word => args.push('--words', word));
@@ -108,7 +108,7 @@ class AudioTools {
    */
   async manifest(options = {}) {
     const args = [];
-    
+
     if (options.audioDir) args.push('--audio-dir', options.audioDir);
     if (options.output) args.push('--output', options.output);
     if (options.verifyFiles) args.push('--verify-files');
@@ -122,7 +122,7 @@ class AudioTools {
    */
   async fullPipeline(options = {}) {
     const args = [];
-    
+
     if (options.outputDir) args.push('--output-dir', options.outputDir);
     if (options.overwrite) args.push('--overwrite');
     if (options.limitVoices) args.push('--limit-voices', options.limitVoices.toString());
@@ -141,11 +141,11 @@ class AudioTools {
    */
   async regenerate(options = {}) {
     const args = [];
-    
+
     if (!options.word) {
       throw new Error('word option is required for regenerate');
     }
-    
+
     args.push('--word', options.word);
     if (options.voice) args.push('--voice', options.voice);
     if (options.outputDir) args.push('--output-dir', options.outputDir);
@@ -160,7 +160,7 @@ class AudioTools {
    */
   async clean(options = {}) {
     const args = [];
-    
+
     if (options.minSize) args.push('--min-size', options.minSize.toString());
     if (options.audioDir) args.push('--audio-dir', options.audioDir);
     if (options.dryRun) args.push('--dry-run');

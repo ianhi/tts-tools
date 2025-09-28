@@ -1,24 +1,25 @@
 """Input adapters for reading text from various sources."""
 
-import json
 import csv
+import json
 import tempfile
 import zipfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union, Tuple
+from typing import Any
 
-from .utils import load_minimal_pairs_data, get_unique_words
+from .utils import get_unique_words, load_minimal_pairs_data
 
 
 @dataclass
 class TextItem:
     """Represents a text item to generate audio for."""
-    text: str                    # The actual text to synthesize
-    identifier: str              # Unique identifier for file naming (transliteration, slug, etc.)
-    language_code: str          # Language code (e.g., "bn-IN", "es-US")
-    metadata: Optional[Dict[str, Any]] = None  # Additional data (source, note_id, field_name, etc.)
+
+    text: str  # The actual text to synthesize
+    identifier: str  # Unique identifier for file naming (transliteration, slug, etc.)
+    language_code: str  # Language code (e.g., "bn-IN", "es-US")
+    metadata: dict[str, Any] | None = None  # Additional data (source, note_id, field_name, etc.)
 
     def __post_init__(self):
         """Validate and normalize the text item."""
@@ -42,7 +43,7 @@ class InputAdapter(ABC):
     """Abstract base class for reading text from various input sources."""
 
     @abstractmethod
-    def get_text_items(self) -> List[TextItem]:
+    def get_text_items(self) -> list[TextItem]:
         """Extract text items from the input source.
 
         Returns:
@@ -86,7 +87,7 @@ class MinimalPairsAdapter(InputAdapter):
         """Get the language code."""
         return self.language_code
 
-    def get_text_items(self) -> List[TextItem]:
+    def get_text_items(self) -> list[TextItem]:
         """Extract text items from minimal pairs data."""
         if self._text_items is None:
             pairs_data = load_minimal_pairs_data(self.pairs_file_path)
@@ -102,8 +103,8 @@ class MinimalPairsAdapter(InputAdapter):
                         "source": "minimal_pairs",
                         "source_file": str(self.pairs_file_path),
                         "native_text": native_text,
-                        "transliteration": transliteration
-                    }
+                        "transliteration": transliteration,
+                    },
                 )
                 self._text_items.append(item)
 
@@ -117,10 +118,10 @@ class TextListAdapter(InputAdapter):
         self,
         file_path: Path,
         language_code: str,
-        format_type: Optional[str] = None,
+        format_type: str | None = None,
         text_column: str = "text",
         identifier_column: str = "identifier",
-        encoding: str = "utf-8"
+        encoding: str = "utf-8",
     ):
         """Initialize the text list adapter.
 
@@ -156,7 +157,7 @@ class TextListAdapter(InputAdapter):
         """Get the language code."""
         return self.language_code
 
-    def get_text_items(self) -> List[TextItem]:
+    def get_text_items(self) -> list[TextItem]:
         """Extract text items from the file."""
         if self._text_items is None:
             if self.format_type == "txt":
@@ -170,10 +171,10 @@ class TextListAdapter(InputAdapter):
 
         return self._text_items
 
-    def _read_txt(self) -> List[TextItem]:
+    def _read_txt(self) -> list[TextItem]:
         """Read from plain text file (one item per line)."""
         items = []
-        with open(self.file_path, 'r', encoding=self.encoding) as f:
+        with open(self.file_path, encoding=self.encoding) as f:
             for line_num, line in enumerate(f, 1):
                 text = line.strip()
                 if text:  # Skip empty lines
@@ -186,16 +187,16 @@ class TextListAdapter(InputAdapter):
                         metadata={
                             "source": "text_file",
                             "source_file": str(self.file_path),
-                            "line_number": line_num
-                        }
+                            "line_number": line_num,
+                        },
                     )
                     items.append(item)
         return items
 
-    def _read_csv(self) -> List[TextItem]:
+    def _read_csv(self) -> list[TextItem]:
         """Read from CSV file."""
         items = []
-        with open(self.file_path, 'r', encoding=self.encoding) as f:
+        with open(self.file_path, encoding=self.encoding) as f:
             reader = csv.DictReader(f)
             for row_num, row in enumerate(reader, 1):
                 text = row.get(self.text_column, "").strip()
@@ -210,22 +211,25 @@ class TextListAdapter(InputAdapter):
                         "source": "csv_file",
                         "source_file": str(self.file_path),
                         "row_number": row_num,
-                        **{k: v for k, v in row.items()
-                           if k not in [self.text_column, self.identifier_column]}
+                        **{
+                            k: v
+                            for k, v in row.items()
+                            if k not in [self.text_column, self.identifier_column]
+                        },
                     }
 
                     item = TextItem(
                         text=text,
                         identifier=identifier,
                         language_code=self.language_code,
-                        metadata=metadata
+                        metadata=metadata,
                     )
                     items.append(item)
         return items
 
-    def _read_json(self) -> List[TextItem]:
+    def _read_json(self) -> list[TextItem]:
         """Read from JSON file."""
-        with open(self.file_path, 'r', encoding=self.encoding) as f:
+        with open(self.file_path, encoding=self.encoding) as f:
             data = json.load(f)
 
         items = []
@@ -244,15 +248,18 @@ class TextListAdapter(InputAdapter):
                             "source": "json_file",
                             "source_file": str(self.file_path),
                             "item_number": item_num,
-                            **{k: v for k, v in item_data.items()
-                               if k not in [self.text_column, self.identifier_column]}
+                            **{
+                                k: v
+                                for k, v in item_data.items()
+                                if k not in [self.text_column, self.identifier_column]
+                            },
                         }
 
                         item = TextItem(
                             text=text,
                             identifier=identifier,
                             language_code=self.language_code,
-                            metadata=metadata
+                            metadata=metadata,
                         )
                         items.append(item)
                 elif isinstance(item_data, str):
@@ -267,8 +274,8 @@ class TextListAdapter(InputAdapter):
                             metadata={
                                 "source": "json_file",
                                 "source_file": str(self.file_path),
-                                "item_number": item_num
-                            }
+                                "item_number": item_num,
+                            },
                         )
                         items.append(item)
 
@@ -284,15 +291,18 @@ class TextListAdapter(InputAdapter):
                 metadata = {
                     "source": "json_file",
                     "source_file": str(self.file_path),
-                    **{k: v for k, v in data.items()
-                       if k not in [self.text_column, self.identifier_column]}
+                    **{
+                        k: v
+                        for k, v in data.items()
+                        if k not in [self.text_column, self.identifier_column]
+                    },
                 }
 
                 item = TextItem(
                     text=text,
                     identifier=identifier,
                     language_code=self.language_code,
-                    metadata=metadata
+                    metadata=metadata,
                 )
                 items.append(item)
 
@@ -311,8 +321,8 @@ class TextListAdapter(InputAdapter):
         import re
 
         # Try to create identifier from text (first 50 chars, alphanumeric only)
-        identifier = re.sub(r'[^\w\s-]', '', text[:50].lower())
-        identifier = re.sub(r'[-\s]+', '_', identifier).strip('_')
+        identifier = re.sub(r"[^\w\s-]", "", text[:50].lower())
+        identifier = re.sub(r"[-\s]+", "_", identifier).strip("_")
 
         if identifier and len(identifier) >= 3:
             return identifier
@@ -328,9 +338,9 @@ class AnkiDeckAdapter(InputAdapter):
         self,
         deck_path: Path,
         language_code: str,
-        text_fields: List[str],
-        identifier_field: Optional[str] = None,
-        deck_name_filter: Optional[str] = None
+        text_fields: list[str],
+        identifier_field: str | None = None,
+        deck_name_filter: str | None = None,
     ):
         """Initialize the Anki deck adapter.
 
@@ -356,11 +366,11 @@ class AnkiDeckAdapter(InputAdapter):
         """Get the language code."""
         return self.language_code
 
-    def get_text_items(self) -> List[TextItem]:
+    def get_text_items(self) -> list[TextItem]:
         """Extract text items from Anki deck."""
         if self._text_items is None:
             # Handle .apkg files by extracting to temp directory
-            if self.deck_path.suffix.lower() == '.apkg':
+            if self.deck_path.suffix.lower() == ".apkg":
                 self._text_items = self._read_apkg()
             else:
                 # Assume .anki2 file
@@ -368,31 +378,31 @@ class AnkiDeckAdapter(InputAdapter):
 
         return self._text_items
 
-    def _read_apkg(self) -> List[TextItem]:
+    def _read_apkg(self) -> list[TextItem]:
         """Read from .apkg file (zip archive)."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
             # Extract .apkg file
-            with zipfile.ZipFile(self.deck_path, 'r') as zip_file:
+            with zipfile.ZipFile(self.deck_path, "r") as zip_file:
                 zip_file.extractall(temp_path)
 
             # Find collection.anki2 file
             collection_file = temp_path / "collection.anki2"
             if not collection_file.exists():
-                raise ValueError(f"Invalid .apkg file: missing collection.anki2")
+                raise ValueError("Invalid .apkg file: missing collection.anki2")
 
             return self._read_anki2_file(collection_file)
 
-    def _read_anki2(self) -> List[TextItem]:
+    def _read_anki2(self) -> list[TextItem]:
         """Read from .anki2 file directly."""
         return self._read_anki2_file(self.deck_path)
 
-    def _read_anki2_file(self, anki2_path: Path) -> List[TextItem]:
+    def _read_anki2_file(self, anki2_path: Path) -> list[TextItem]:
         """Read from .anki2 collection file using direct SQLite access."""
-        import sqlite3
         import json
         import re
+        import sqlite3
 
         items = []
 
@@ -403,19 +413,19 @@ class AnkiDeckAdapter(InputAdapter):
 
             # Get note types (models) to understand field structure
             cursor.execute("SELECT models FROM col")
-            models_json = cursor.fetchone()['models']
+            models_json = cursor.fetchone()["models"]
             models = json.loads(models_json)
 
             # Get deck information if filtering by deck name
             deck_id = None
             if self.deck_name_filter:
                 cursor.execute("SELECT decks FROM col")
-                decks_json = cursor.fetchone()['decks']
+                decks_json = cursor.fetchone()["decks"]
                 decks = json.loads(decks_json)
 
                 for deck_data in decks.values():
-                    if deck_data['name'] == self.deck_name_filter:
-                        deck_id = deck_data['id']
+                    if deck_data["name"] == self.deck_name_filter:
+                        deck_id = deck_data["id"]
                         break
 
                 if deck_id is None:
@@ -437,14 +447,14 @@ class AnkiDeckAdapter(InputAdapter):
             notes = cursor.fetchall()
 
             for note in notes:
-                note_id = note['id']
-                model_id = str(note['mid'])
-                fields_data = note['flds']
+                note_id = note["id"]
+                model_id = str(note["mid"])
+                fields_data = note["flds"]
 
                 # Get field names from model
                 if model_id in models:
-                    field_names = [field['name'] for field in models[model_id]['flds']]
-                    field_values = fields_data.split('\x1f')  # Anki field separator
+                    field_names = [field["name"] for field in models[model_id]["flds"]]
+                    field_values = fields_data.split("\x1f")  # Anki field separator
 
                     # Create field mapping
                     note_fields = {}
@@ -459,14 +469,16 @@ class AnkiDeckAdapter(InputAdapter):
 
                             # Clean HTML tags and whitespace
                             if text:
-                                text = re.sub(r'<[^>]+>', '', text)  # Remove HTML tags
+                                text = re.sub(r"<[^>]+>", "", text)  # Remove HTML tags
                                 text = text.strip()
 
                             if text:  # Only process non-empty text
                                 # Generate identifier
                                 identifier_text = note_fields.get(self.identifier_field, text)
-                                identifier_text = re.sub(r'<[^>]+>', '', identifier_text).strip()
-                                identifier = self._generate_identifier(identifier_text, note_id, field_name)
+                                identifier_text = re.sub(r"<[^>]+>", "", identifier_text).strip()
+                                identifier = self._generate_identifier(
+                                    identifier_text, note_id, field_name
+                                )
 
                                 item = TextItem(
                                     text=text,
@@ -479,15 +491,15 @@ class AnkiDeckAdapter(InputAdapter):
                                         "field_name": field_name,
                                         "deck_name": self.deck_name_filter,
                                         "model_id": model_id,
-                                        "all_fields": note_fields
-                                    }
+                                        "all_fields": note_fields,
+                                    },
                                 )
                                 items.append(item)
 
         except sqlite3.Error as e:
-            raise ValueError(f"Error reading Anki database: {e}")
+            raise ValueError(f"Error reading Anki database: {e}") from e
         finally:
-            if 'conn' in locals():
+            if "conn" in locals():
                 conn.close()
 
         return items
@@ -497,15 +509,15 @@ class AnkiDeckAdapter(InputAdapter):
         import re
 
         # Try to create identifier from text
-        identifier = re.sub(r'[^\w\s-]', '', text[:50].lower())
-        identifier = re.sub(r'[-\s]+', '_', identifier).strip('_')
+        identifier = re.sub(r"[^\w\s-]", "", text[:50].lower())
+        identifier = re.sub(r"[-\s]+", "_", identifier).strip("_")
 
         if identifier and len(identifier) >= 3:
             return f"{identifier}_{note_id}_{field_name}"
         else:
             return f"note_{note_id}_{field_name}"
 
-    def get_missing_audio_items(self, existing_audio_dir: Path) -> List[TextItem]:
+    def get_missing_audio_items(self, existing_audio_dir: Path) -> list[TextItem]:
         """Get text items that don't have existing audio files.
 
         Args:
@@ -527,10 +539,7 @@ class AnkiDeckAdapter(InputAdapter):
 
 
 def create_adapter(
-    source_type: str,
-    source_path: Union[str, Path],
-    language_code: str,
-    **kwargs
+    source_type: str, source_path: str | Path, language_code: str, **kwargs
 ) -> InputAdapter:
     """Factory function to create appropriate input adapter.
 

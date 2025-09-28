@@ -1,15 +1,14 @@
 """Models for speech recognition and text normalization."""
 
-import unicodedata
 import re
-from typing import Tuple
+import unicodedata
 from abc import ABC, abstractmethod
 
+import edit_distance
+from google.api_core.client_options import ClientOptions
 from google.cloud import speech
 from google.cloud.speech_v2 import SpeechClient as SpeechV2Client
 from google.cloud.speech_v2.types import cloud_speech
-from google.api_core.client_options import ClientOptions
-import edit_distance
 
 from .utils import get_google_cloud_project_id
 
@@ -36,13 +35,13 @@ class BengaliTextNormalizer(TextNormalizer):
         if not text:
             return ""
 
-        text = unicodedata.normalize('NFC', text)
+        text = unicodedata.normalize("NFC", text)
         # Remove Bengali punctuation and digits
-        text = re.sub(r'[।,;:?!।০-৯]', '', text)
-        text = ' '.join(text.split())
+        text = re.sub(r"[।,;:?!।০-৯]", "", text)
+        text = " ".join(text.split())
         text = text.lower()
         # Remove zero-width characters
-        text = re.sub(r'[\u200b-\u200f\ufeff]', '', text)
+        text = re.sub(r"[\u200b-\u200f\ufeff]", "", text)
         return text.strip()
 
     def calculate_edit_distance(self, expected: str, actual: str) -> int:
@@ -60,13 +59,13 @@ class SpanishTextNormalizer(TextNormalizer):
         if not text:
             return ""
 
-        text = unicodedata.normalize('NFC', text)
+        text = unicodedata.normalize("NFC", text)
         # Remove common punctuation
-        text = re.sub(r'[.,;:?!¡¿]', '', text)
-        text = ' '.join(text.split())
+        text = re.sub(r"[.,;:?!¡¿]", "", text)
+        text = " ".join(text.split())
         text = text.lower()
         # Remove zero-width characters
-        text = re.sub(r'[\u200b-\u200f\ufeff]', '', text)
+        text = re.sub(r"[\u200b-\u200f\ufeff]", "", text)
         return text.strip()
 
     def calculate_edit_distance(self, expected: str, actual: str) -> int:
@@ -78,16 +77,16 @@ class SpanishTextNormalizer(TextNormalizer):
 
 class VerificationModel(ABC):
     """Abstract base class for speech verification models."""
-    
+
     @abstractmethod
-    def transcribe(self, audio_file_path: str) -> Tuple[str, float]:
+    def transcribe(self, audio_file_path: str) -> tuple[str, float]:
         """Transcribe audio file and return (transcript, confidence)."""
         pass
 
 
 class GcpStandardModel(VerificationModel):
     """Google Cloud Speech-to-Text standard model."""
-    
+
     def __init__(self, language_code: str):
         self.language_code = language_code
         self.client = speech.SpeechClient()
@@ -100,11 +99,12 @@ class GcpStandardModel(VerificationModel):
             enable_automatic_punctuation=True,
         )
 
-    def transcribe(self, audio_file_path: str) -> Tuple[str, float]:
+    def transcribe(self, audio_file_path: str) -> tuple[str, float]:
         """Transcribe audio file using GCP standard model."""
         import logging
+
         logger = logging.getLogger(__name__)
-        
+
         try:
             with open(audio_file_path, "rb") as audio_file:
                 content = audio_file.read()
@@ -130,12 +130,12 @@ class GcpStandardModel(VerificationModel):
 
 class Chirp2Model(VerificationModel):
     """Google Cloud Speech-to-Text Chirp2 model."""
-    
+
     def __init__(self, language_code: str, region: str = "us-central1"):
         self.language_code = language_code
         self.region = region
         self.project_id = get_google_cloud_project_id()
-        
+
         api_endpoint = f"{self.region}-speech.googleapis.com"
         self.client = SpeechV2Client(client_options=ClientOptions(api_endpoint=api_endpoint))
         self.config = cloud_speech.RecognitionConfig(
@@ -145,11 +145,12 @@ class Chirp2Model(VerificationModel):
             features=cloud_speech.RecognitionFeatures(enable_automatic_punctuation=True),
         )
 
-    def transcribe(self, audio_file_path: str) -> Tuple[str, float]:
+    def transcribe(self, audio_file_path: str) -> tuple[str, float]:
         """Transcribe audio file using Chirp2 model."""
         import logging
+
         logger = logging.getLogger(__name__)
-        
+
         try:
             with open(audio_file_path, "rb") as f:
                 content = f.read()
