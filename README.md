@@ -4,16 +4,16 @@ A flexible, multi-voice text-to-speech generation toolkit designed for language 
 
 ## Features
 
-- **🎵 Multi-Voice TTS**: Generate audio using multiple Google Cloud TTS voices per text item
-- **📚 Multiple Input Sources**:
+- **Multi-Voice TTS**: Generate audio using multiple Google Cloud TTS voices per text item
+- **Multiple Input Sources**:
   - Minimal pairs JSON (backward compatibility)
   - Plain text files, CSV, JSON
   - Anki deck files (.apkg/.anki2)
-- **🎯 High-Quality Audio**: MP3 output with silence trimming and quality validation
-- **🌍 Language Support**: Bengali (bn-IN), Spanish (es-US), extensible to other languages
-- **⚡ Async Processing**: Parallel generation for performance
-- **✅ Audio Verification**: Speech-to-text verification of generated audio
-- **📊 Manifest Management**: Track all generated audio files for easy integration
+- **High-Quality Audio**: MP3 output with silence trimming and quality validation
+- **Language Support**: Bengali (bn-IN), Spanish (es-US), extensible to other languages
+- **Async Processing**: Parallel generation for performance
+- **Audio Verification**: Speech-to-text verification of generated audio
+- **Manifest Management**: Track all generated audio files for easy integration
 
 ## Prerequisites
 
@@ -58,13 +58,13 @@ This tool uses Google Cloud Text-to-Speech API. You need to set up authenticatio
    export GOOGLE_CLOUD_PROJECT="your-project-id"
    ```
 
-⚠️ **Security Note**: Never commit credential files to git. The `.gitignore` file already excludes common credential file patterns.
+**Security Note**: Never commit credential files to git. The `.gitignore` file already excludes common credential file patterns.
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/ianhi/tts-tools.git
 cd tts-tools
 
 # Install with uv (recommended)
@@ -112,6 +112,9 @@ tts-tools generate-from-text words.txt --language bn-IN --limit-voices 2
 tts-tools generate-from-text data.csv --language bn-IN \
     --text-column "bengali_text" \
     --identifier-column "word_id"
+
+# Generate clean filenames without source metadata
+tts-tools generate-from-text words.csv --language bn-IN --clean-filenames
 
 # Preview without generating
 tts-tools generate-from-text words.txt --language bn-IN --dry-run
@@ -200,10 +203,10 @@ tts-tools verify \
 
 ```bash
 # Generate manifest for audio files
-minimal-pairs-audio manifest
+tts-tools manifest
 
 # Verify manifest and fix missing files
-minimal-pairs-audio manifest \
+tts-tools manifest \
     --verify-files \
     --fix-missing
 ```
@@ -211,17 +214,17 @@ minimal-pairs-audio manifest \
 #### Clean Invalid Audio Files
 
 ```bash
-# Remove small/invalid audio files
-minimal-pairs-audio clean --min-size 5000
+# Remove invalid audio files
+tts-tools clean --min-size 5000
 
-# Preview what would be deleted
-minimal-pairs-audio clean --min-size 5000 --dry-run
+# Dry run to see what would be cleaned
+tts-tools clean --dry-run
 ```
 
 ### Python API
 
 ```python
-from minimal_pairs_audio import AudioGenerator, PronunciationVerifier, Chirp2Model
+from tts_tools import AudioGenerator, PronunciationVerifier, Chirp2Model
 
 # Generate audio
 generator = AudioGenerator(
@@ -331,19 +334,10 @@ text,identifier
 ]
 ```
 
-## Project Structure
+## Contributing
 
-```
-audio_tools/
-   src/
-      minimal_pairs_audio/
-          __init__.py       # Package exports
-          cli.py            # CLI interface
-          generator.py      # Audio generation
-          verifier.py       # Pronunciation verification
-          manifest.py       # Manifest management
-          models.py         # STT models and text normalization
-          utils.py          # Utility functions
-   pyproject.toml            # Package configuration
-   README.md                 # This file
-```
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
