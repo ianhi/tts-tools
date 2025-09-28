@@ -1,7 +1,7 @@
 [project]
-name = "minimal-pairs-audio"
+name = "lang-audio-generator"
 version = "0.1.0"
-description = "Audio generation and verification tools for minimal pairs language learning"
+description = "Multi-voice audio generation tools for language learning and Anki deck enhancement"
 readme = "README.md"
 authors = [
     { name = "Ian Hunt-Isaak", email = "ianhuntisaak@gmail.com" }
@@ -17,10 +17,12 @@ dependencies = [
     "scipy>=1.11.0",
     "librosa>=0.10.0",
     "soundfile>=0.12.0",
+    "ankipandas>=0.3.20",
+    "pandas>=1.5.0",
 ]
 
 [project.scripts]
-minimal-pairs-audio = "minimal_pairs_audio.cli:main"
+lang-audio-generator = "minimal_pairs_audio.cli:main"
 
 [build-system]
 requires = ["hatchling"]

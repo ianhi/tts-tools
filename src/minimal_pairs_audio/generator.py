@@ -10,7 +10,7 @@ from scipy.io import wavfile
 import librosa
 import soundfile as sf
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
+from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
 from rich.table import Table
 from rich import box
 from pydub import AudioSegment
@@ -387,12 +387,38 @@ class AudioGenerator:
         
         return {"status": "failed", "reason": f"Failed after {self.max_retries} attempts"}
 
+    def discover_missing_files(self, unique_words, voices):
+        """Discover which word/voice combinations are missing audio files."""
+        missing = []
+        existing = []
+        
+        for bengali_text, transliteration in unique_words:
+            word_dir = self.base_output_path / transliteration
+            
+            for voice_name in voices:
+                minimal_voice_name = get_minimal_voice_name(voice_name)
+                output_filename = f"{transliteration}_{minimal_voice_name}.mp3"
+                output_file = word_dir / output_filename
+                
+                if not output_file.exists() or self.overwrite:
+                    missing.append((bengali_text, transliteration, voice_name))
+                else:
+                    # Validate existing file
+                    validation = validate_audio_file(output_file, self.min_file_size, self.min_duration)
+                    if not validation["valid"]:
+                        missing.append((bengali_text, transliteration, voice_name))
+                    else:
+                        existing.append((bengali_text, transliteration, voice_name))
+        
+        return missing, existing
+
     def generate_all_audio(
         self,
         pairs_data_path: Optional[Path] = None,
         volume_gain_db: float = 0.0,
         effects_profile: str = "headphone-class-device",
-        voice_type: str = "all"
+        voice_type: str = "all",
+        dry_run: bool = False
     ) -> Dict[str, Any]:
         """Generate audio for all words in the minimal pairs database."""
         # Load data
@@ -415,92 +441,109 @@ class AudioGenerator:
         if self.limit_voices:
             voices = voices[:self.limit_voices]
         
+        # Discover missing files
+        console.print("[dim]Discovering missing audio files...[/dim]")
+        missing_files, existing_files = self.discover_missing_files(unique_words, voices)
+        
+        # Calculate unique words that need generation
+        words_needing_generation = set()
+        for _, transliteration, _ in missing_files:
+            words_needing_generation.add(transliteration)
+        
         # Statistics
         total_words = len(unique_words)
-        total_attempts = total_words * len(voices)
+        words_to_generate = len(words_needing_generation)
+        total_possible = total_words * len(voices)
+        total_to_generate = len(missing_files)
+        total_existing = len(existing_files)
         
-        console.print(f"[bold blue]Processing {total_words} unique words with {len(voices)} voices[/bold blue]")
-        console.print(f"[dim]Total recordings to generate: {total_attempts}[/dim]")
+        console.print(f"[bold blue]Audio File Status:[/bold blue]")
+        console.print(f"  • Total words in database: {total_words}")
+        console.print(f"  • Words needing audio: [yellow]{words_to_generate}[/yellow]")
+        console.print(f"  • Voices per word: {len(voices)}")
+        console.print(f"  • Existing audio files: [green]{total_existing}[/green]")
+        console.print(f"  • Files to generate: [yellow]{total_to_generate}[/yellow] ({words_to_generate} words × up to {len(voices)} voices)")
+        
+        if dry_run:
+            console.print("\n[bold yellow]DRY RUN MODE - No files will be generated[/bold yellow]")
+            if missing_files:
+                console.print("\n[dim]Files that would be generated:[/dim]")
+                for i, (bengali, transliteration, voice) in enumerate(missing_files[:10]):
+                    minimal_voice = get_minimal_voice_name(voice)
+                    console.print(f"  {i+1}. {bengali} ({transliteration}) - {minimal_voice}")
+                if len(missing_files) > 10:
+                    console.print(f"  ... and {len(missing_files) - 10} more")
+            return {"dry_run": True, "missing": total_to_generate, "existing": total_existing}
+        
+        if total_to_generate == 0:
+            console.print("\n[bold green]✓ All audio files already exist![/bold green]")
+            return {"successful": 0, "failed": 0, "skipped": total_existing, "regenerated": 0, "words": {}}
         
         results = {
             "successful": 0,
             "failed": 0,
-            "skipped": 0,
+            "skipped": total_existing,  # Count existing files as skipped
             "regenerated": 0,
             "words": {}
         }
         
-        # Process each word
+        # Process only missing files
         with Progress(
-            SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("({task.completed}/{task.total})"),
             TimeRemainingColumn(),
-            console=console
+            console=console,
+            refresh_per_second=2,  # Reduce refresh rate to minimize visual duplication
+            transient=True  # Clear progress bar when done
         ) as progress:
-            main_task = progress.add_task("Generating audio...", total=total_words)
-            voice_task = progress.add_task("", total=len(voices), visible=False)
+            main_task = progress.add_task("Generating missing audio files...", total=total_to_generate)
             
-            for word_idx, (bengali_text, transliteration) in enumerate(unique_words):
-                word_results = []
+            for idx, (bengali_text, transliteration, voice_name) in enumerate(missing_files):
+                minimal_voice = get_minimal_voice_name(voice_name)
                 
-                # Show detailed progress for each word
+                # Update progress description before processing
                 progress.update(main_task, 
-                    description=f"Processing {transliteration} ({bengali_text}) [{word_idx+1}/{total_words}]")
-                progress.update(voice_task, completed=0, total=len(voices), visible=True,
-                    description=f"Voices for {transliteration}")
+                    description=f"[{idx+1}/{total_to_generate}] {transliteration} - {minimal_voice}")
                 
-                for voice_idx, voice_name in enumerate(voices):
-                    # Update voice-level progress
-                    minimal_voice = get_minimal_voice_name(voice_name)
-                    progress.update(voice_task, completed=voice_idx,
-                        description=f"Voice: {minimal_voice}")
-                    
-                    voice_config = {
-                        "voice_name": voice_name,
-                        "volume_gain_db": volume_gain_db,
-                        "effects_profile": effects_profile
-                    }
-                    
-                    try:
-                        result = self.process_word_recording(
-                            bengali_text, 
-                            transliteration, 
-                            voice_config
-                        )
-                    except TimeoutError as e:
-                        console.print(f"[red]⏰ Timeout processing {transliteration} with {minimal_voice}: {e}[/red]")
-                        result = {"status": "failed", "reason": f"Timeout: {str(e)}"}
-                    except Exception as e:
-                        console.print(f"[red]❌ Error processing {transliteration} with {minimal_voice}: {e}[/red]")
-                        result = {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
-                    
-                    word_results.append(result)
-                    
-                    # Update statistics
-                    if result["status"] == "success":
-                        results["successful"] += 1
-                    elif result["status"] == "failed":
-                        results["failed"] += 1
-                    elif result["status"] == "skipped":
-                        results["skipped"] += 1
-                    elif result["status"] == "regenerate":
-                        results["regenerated"] += 1
-                
-                # Complete voice progress for this word
-                progress.update(voice_task, completed=len(voices))
-                
-                results["words"][transliteration] = {
-                    "bengali": bengali_text,
-                    "results": word_results
+                voice_config = {
+                    "voice_name": voice_name,
+                    "volume_gain_db": volume_gain_db,
+                    "effects_profile": effects_profile
                 }
                 
-                # Update main progress
+                try:
+                    result = self.process_word_recording(
+                        bengali_text, 
+                        transliteration, 
+                        voice_config
+                    )
+                except TimeoutError as e:
+                    console.print(f"[red]⏰ Timeout processing {transliteration} with {minimal_voice}: {e}[/red]")
+                    result = {"status": "failed", "reason": f"Timeout: {str(e)}"}
+                except Exception as e:
+                    console.print(f"[red]❌ Error processing {transliteration} with {minimal_voice}: {e}[/red]")
+                    result = {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
+                
+                # Update statistics based on actual result (not assumed skipped)
+                if result["status"] == "success":
+                    results["successful"] += 1
+                elif result["status"] == "failed":
+                    results["failed"] += 1
+                elif result["status"] == "regenerate":
+                    results["regenerated"] += 1
+                
+                # Store result for this word/voice combo
+                if transliteration not in results["words"]:
+                    results["words"][transliteration] = {
+                        "bengali": bengali_text,
+                        "results": []
+                    }
+                results["words"][transliteration]["results"].append(result)
+                
+                # Advance the progress bar after processing
                 progress.update(main_task, advance=1)
-            
-            # Hide voice task when done
-            progress.update(voice_task, visible=False)
         
         # Print summary
         self._print_summary(results)

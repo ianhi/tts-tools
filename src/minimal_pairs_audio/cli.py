@@ -90,8 +90,10 @@ def main(config: AudioToolsConfig, language):
               help='Volume gain in dB')
 @click.option('--pairs-file', '-p', type=click.Path(exists=True), 
               help='Path to minimal pairs JSON file')
+@click.option('--dry-run', is_flag=True,
+              help='Show what would be generated without actually generating files')
 @pass_config
-def generate(config: AudioToolsConfig, output_dir, overwrite, limit_voices, voice_type, volume_gain, pairs_file):
+def generate(config: AudioToolsConfig, output_dir, overwrite, limit_voices, voice_type, volume_gain, pairs_file, dry_run):
     """Generate audio files for all minimal pairs."""
     for lang_code in config.languages:
         console.print(f"[bold blue]🎵 Generating audio files for {lang_code}...[/bold blue]")
@@ -108,13 +110,9 @@ def generate(config: AudioToolsConfig, output_dir, overwrite, limit_voices, voic
         results = generator.generate_all_audio(
             pairs_data_path=pairs_path,
             volume_gain_db=volume_gain,
-            voice_type=voice_type
+            voice_type=voice_type,
+            dry_run=dry_run
         )
-        
-        # Generate manifest after audio generation
-        console.print("\n[bold blue]📋 Generating audio manifest...[/bold blue]")
-        manifest_gen = ManifestGenerator(config=lang_config)
-        manifest_gen.generate_manifest()
 
 
 
@@ -219,11 +217,17 @@ def manifest(config: AudioToolsConfig, audio_dir, output, verify_files, fix_miss
               help='Skip the verification step')
 @click.option('--language', '-lang', type=click.Choice(['bn-IN', 'es-US']), 
               default='bn-IN', help='Language to generate audio for')
+@click.option('--dry-run', is_flag=True,
+              help='Show what would be generated without actually generating files')
 def full_pipeline(output_dir, overwrite, limit_voices, voice_type, volume_gain, 
-                 pairs_file, model, max_verify_files, skip_verification, language):
+                 pairs_file, model, max_verify_files, skip_verification, language, dry_run):
     """Complete pipeline: generate audio, create manifest, and verify quality."""
     console.print("[bold green]🚀 Running Full Audio Pipeline[/bold green]")
     console.print("[dim]This will: 1) Generate audio, 2) Create manifest, 3) Verify quality[/dim]\n")
+    
+    # Create config for the specified language
+    base_config = AudioToolsConfig()
+    config = create_language_config(base_config, language)
     
     if output_dir is None:
         output_dir = str(config.base_audio_dir)
@@ -241,8 +245,13 @@ def full_pipeline(output_dir, overwrite, limit_voices, voice_type, volume_gain,
     generation_results = generator.generate_all_audio(
         pairs_data_path=pairs_path,
         volume_gain_db=volume_gain,
-        voice_type=voice_type
+        voice_type=voice_type,
+        dry_run=dry_run
     )
+    
+    # If dry run, skip manifest and verification steps
+    if dry_run:
+        return generation_results
     
     # Step 2: Generate Manifest
     console.print("\n[bold blue]Step 2/3: 📋 Generating audio manifest...[/bold blue]")
@@ -598,7 +607,8 @@ def full_pipeline_async(config: AudioToolsConfig, output_dir, overwrite, limit_v
             pairs_data_path=pairs_path,
             volume_gain_db=volume_gain,
             effects_profile="headphone-class-device",
-            voice_type=voice_type
+            voice_type=voice_type,
+            dry_run=False
         )
     
     if results["failed"] > 0:
