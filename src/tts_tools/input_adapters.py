@@ -359,14 +359,6 @@ class AnkiDeckAdapter(InputAdapter):
     def get_text_items(self) -> List[TextItem]:
         """Extract text items from Anki deck."""
         if self._text_items is None:
-            try:
-                import ankipandas as akp
-            except ImportError:
-                raise ImportError(
-                    "ankipandas is required to read Anki decks. "
-                    "Install with: pip install ankipandas"
-                )
-
             # Handle .apkg files by extracting to temp directory
             if self.deck_path.suffix.lower() == '.apkg':
                 self._text_items = self._read_apkg()
@@ -397,72 +389,106 @@ class AnkiDeckAdapter(InputAdapter):
         return self._read_anki2_file(self.deck_path)
 
     def _read_anki2_file(self, anki2_path: Path) -> List[TextItem]:
-        """Read from .anki2 collection file using ankipandas."""
-        import ankipandas as akp
-
-        collection = akp.Collection(str(anki2_path))
-
-        # Get notes data
-        notes = collection.notes
-        cards = collection.cards
-
-        # Filter by deck name if specified
-        if self.deck_name_filter:
-            # Join with cards and decks to filter by deck name
-            decks = collection.decks
-            filtered_cards = cards.merge(decks, left_on='did', right_on='id', suffixes=('', '_deck'))
-            filtered_cards = filtered_cards[filtered_cards['name'] == self.deck_name_filter]
-            note_ids = filtered_cards['nid'].unique()
-            notes = notes[notes['nid'].isin(note_ids)]
+        """Read from .anki2 collection file using direct SQLite access."""
+        import sqlite3
+        import json
+        import re
 
         items = []
-        for _, note in notes.iterrows():
-            note_id = note['nid']
 
-            # Extract field data
-            fields_data = note['nflds']  # Field names are in the note type
-            fields_list = fields_data if isinstance(fields_data, list) else []
+        try:
+            conn = sqlite3.connect(str(anki2_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-            # Try to parse fields from note
-            note_fields = {}
-            if hasattr(note, 'fields') and note.fields:
-                note_fields = note.fields
-            elif len(fields_list) > 0:
-                # Fallback: use positional field access
-                for i, field_value in enumerate(fields_list[:len(self.text_fields)]):
-                    if i < len(self.text_fields):
-                        note_fields[self.text_fields[i]] = field_value
+            # Get note types (models) to understand field structure
+            cursor.execute("SELECT models FROM col")
+            models_json = cursor.fetchone()['models']
+            models = json.loads(models_json)
 
-            # Extract text from specified fields
-            for field_name in self.text_fields:
-                text = note_fields.get(field_name, "")
+            # Get deck information if filtering by deck name
+            deck_id = None
+            if self.deck_name_filter:
+                cursor.execute("SELECT decks FROM col")
+                decks_json = cursor.fetchone()['decks']
+                decks = json.loads(decks_json)
 
-                # Clean HTML tags and whitespace
-                if text:
-                    import re
-                    text = re.sub(r'<[^>]+>', '', text)  # Remove HTML tags
-                    text = text.strip()
+                for deck_data in decks.values():
+                    if deck_data['name'] == self.deck_name_filter:
+                        deck_id = deck_data['id']
+                        break
 
-                if text:  # Only process non-empty text
-                    # Generate identifier
-                    identifier_text = note_fields.get(self.identifier_field, text)
-                    identifier_text = re.sub(r'<[^>]+>', '', identifier_text).strip()
-                    identifier = self._generate_identifier(identifier_text, note_id, field_name)
+                if deck_id is None:
+                    return []  # Deck not found
 
-                    item = TextItem(
-                        text=text,
-                        identifier=identifier,
-                        language_code=self.language_code,
-                        metadata={
-                            "source": "anki_deck",
-                            "source_file": str(self.deck_path),
-                            "note_id": note_id,
-                            "field_name": field_name,
-                            "deck_name": self.deck_name_filter,
-                            "all_fields": note_fields
-                        }
-                    )
-                    items.append(item)
+            # Query notes, optionally filtered by deck
+            if deck_id:
+                query = """
+                SELECT DISTINCT n.id, n.mid, n.flds, n.tags
+                FROM notes n
+                JOIN cards c ON n.id = c.nid
+                WHERE c.did = ?
+                """
+                cursor.execute(query, (deck_id,))
+            else:
+                query = "SELECT id, mid, flds, tags FROM notes"
+                cursor.execute(query)
+
+            notes = cursor.fetchall()
+
+            for note in notes:
+                note_id = note['id']
+                model_id = str(note['mid'])
+                fields_data = note['flds']
+
+                # Get field names from model
+                if model_id in models:
+                    field_names = [field['name'] for field in models[model_id]['flds']]
+                    field_values = fields_data.split('\x1f')  # Anki field separator
+
+                    # Create field mapping
+                    note_fields = {}
+                    for i, field_name in enumerate(field_names):
+                        if i < len(field_values):
+                            note_fields[field_name] = field_values[i]
+
+                    # Extract text from specified fields
+                    for field_name in self.text_fields:
+                        if field_name in note_fields:
+                            text = note_fields[field_name]
+
+                            # Clean HTML tags and whitespace
+                            if text:
+                                text = re.sub(r'<[^>]+>', '', text)  # Remove HTML tags
+                                text = text.strip()
+
+                            if text:  # Only process non-empty text
+                                # Generate identifier
+                                identifier_text = note_fields.get(self.identifier_field, text)
+                                identifier_text = re.sub(r'<[^>]+>', '', identifier_text).strip()
+                                identifier = self._generate_identifier(identifier_text, note_id, field_name)
+
+                                item = TextItem(
+                                    text=text,
+                                    identifier=identifier,
+                                    language_code=self.language_code,
+                                    metadata={
+                                        "source": "anki_deck",
+                                        "source_file": str(self.deck_path),
+                                        "note_id": note_id,
+                                        "field_name": field_name,
+                                        "deck_name": self.deck_name_filter,
+                                        "model_id": model_id,
+                                        "all_fields": note_fields
+                                    }
+                                )
+                                items.append(item)
+
+        except sqlite3.Error as e:
+            raise ValueError(f"Error reading Anki database: {e}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
 
         return items
 
