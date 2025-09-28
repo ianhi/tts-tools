@@ -724,6 +724,9 @@ def full_pipeline_async(
     "--identifier-column", default="identifier", help="Column name for identifier (CSV/JSON)"
 )
 @click.option("--encoding", default="utf-8", help="File encoding")
+@click.option(
+    "--clean-filenames", is_flag=True, help="Generate clean filenames without source metadata"
+)
 @click.option("--dry-run", is_flag=True, help="Show what would be generated without generating")
 @pass_config
 def generate_from_text(
@@ -738,6 +741,7 @@ def generate_from_text(
     text_column,
     identifier_column,
     encoding,
+    clean_filenames,
     dry_run,
 ):
     """Generate audio from text files (TXT, CSV, JSON)."""
@@ -774,6 +778,7 @@ def generate_from_text(
         language_code=language,
         voice_config=voice_config,
         overwrite=overwrite,
+        clean_filenames=clean_filenames,
     )
 
     if dry_run:

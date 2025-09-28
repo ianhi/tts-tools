@@ -189,6 +189,7 @@ class GenericAudioGenerator:
         base_output_path: Path | None = None,
         language_code: str | None = None,
         overwrite: bool = False,
+        clean_filenames: bool = False,
     ):
         """Initialize the generic audio generator.
 
@@ -210,6 +211,7 @@ class GenericAudioGenerator:
             output_config = OutputConfig(
                 base_output_dir=base_output_path,
                 organization_strategy="by_language",
+                include_metadata=not clean_filenames,  # Clean filenames = no metadata
             )
 
         self.voice_config = voice_config
