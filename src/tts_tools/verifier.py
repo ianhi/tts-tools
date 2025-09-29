@@ -220,17 +220,17 @@ class PronunciationVerifier:
             summary_table.add_row(
                 "Exact Matches",
                 str(summary["exact_matches"]),
-                f"{summary['exact_match_rate']*100:.1f}%",
+                f"{summary['exact_match_rate'] * 100:.1f}%",
             )
             summary_table.add_row(
                 "Normalized Matches",
                 str(summary["normalized_matches"]),
-                f"{summary['normalized_match_rate']*100:.1f}%",
+                f"{summary['normalized_match_rate'] * 100:.1f}%",
             )
             summary_table.add_row(
                 "High Confidence (>0.8)",
                 str(summary["high_confidence"]),
-                f"{summary['high_confidence_rate']*100:.1f}%",
+                f"{summary['high_confidence_rate'] * 100:.1f}%",
             )
 
         console.print(summary_table)

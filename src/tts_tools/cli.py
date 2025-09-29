@@ -786,7 +786,7 @@ def generate_from_text(
         items = adapter.get_text_items()
         console.print(f"Would generate audio for {len(items)} text items:")
         for i, item in enumerate(items[:10]):  # Show first 10
-            console.print(f"  {i+1}. {item.text} → {item.identifier}")
+            console.print(f"  {i + 1}. {item.text} → {item.identifier}")
         if len(items) > 10:
             console.print(f"  ... and {len(items) - 10} more items")
         return
@@ -895,7 +895,7 @@ def generate_from_anki(
             console.print(f"Would generate audio for {len(items)} text items from Anki deck:")
             for i, item in enumerate(items[:10]):  # Show first 10
                 deck_info = item.metadata.get("deck_name", "Unknown")
-                console.print(f"  {i+1}. {item.text} → {item.identifier} (deck: {deck_info})")
+                console.print(f"  {i + 1}. {item.text} → {item.identifier} (deck: {deck_info})")
             if len(items) > 10:
                 console.print(f"  ... and {len(items) - 10} more items")
             return
