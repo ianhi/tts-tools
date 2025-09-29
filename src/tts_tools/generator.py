@@ -472,7 +472,7 @@ class AudioGenerator:
                 console.print("\n[dim]Files that would be generated:[/dim]")
                 for i, (bengali, transliteration, voice) in enumerate(missing_files[:10]):
                     minimal_voice = get_minimal_voice_name(voice)
-                    console.print(f"  {i+1}. {bengali} ({transliteration}) - {minimal_voice}")
+                    console.print(f"  {i + 1}. {bengali} ({transliteration}) - {minimal_voice}")
                 if len(missing_files) > 10:
                     console.print(f"  ... and {len(missing_files) - 10} more")
             return {"dry_run": True, "missing": total_to_generate, "existing": total_existing}
@@ -516,7 +516,7 @@ class AudioGenerator:
                 # Update progress description before processing
                 progress.update(
                     main_task,
-                    description=f"[{idx+1}/{total_to_generate}] {transliteration} - {minimal_voice}",
+                    description=f"[{idx + 1}/{total_to_generate}] {transliteration} - {minimal_voice}",
                 )
 
                 voice_config = {

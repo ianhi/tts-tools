@@ -536,7 +536,7 @@ class GenericAudioGenerator:
             for i, text_item in enumerate(text_items):
                 if progress_callback:
                     progress_callback(
-                        f"Processing item {i+1}/{total_items}: {text_item.identifier}"
+                        f"Processing item {i + 1}/{total_items}: {text_item.identifier}"
                     )
 
                 progress.update(task, description=f"Processing {text_item.identifier}")

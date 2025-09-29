@@ -71,7 +71,7 @@ async def synthesize_raw_audio_async(
         sample_rate, samples = wavfile.read(io.BytesIO(response.audio_content))
         return sample_rate, samples
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise TimeoutError(f"TTS synthesis timed out after {timeout} seconds") from None
     except Exception as e:
         raise Exception(f"TTS synthesis failed: {str(e)}") from e
