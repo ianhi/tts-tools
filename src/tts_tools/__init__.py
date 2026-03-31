@@ -139,22 +139,19 @@ async def synthesize_batch(
 ) -> list[SynthesisResult]:
     """Synthesize a batch of texts concurrently.
 
-    For Gemini with short texts, automatically uses the efficient
-    batch-and-split strategy.
+    Concurrency is controlled by *max_concurrent* (default 10). For Google
+    Cloud TTS this maps well to the standard 300 req/min quota. For Gemini
+    TTS, short texts are automatically batched into a single API call.
+
+    Args:
+        texts: List of texts to synthesize.
+        language: BCP-47 language code.
+        max_concurrent: Max parallel requests. For Google Cloud TTS, 10 is a
+            safe default. For Gemini, this is capped at 1 (10 RPM limit) unless
+            using the batch-and-split strategy for short texts.
     """
     if engine == Engine.GEMINI:
-        from ._gemini import SHORT_TEXT_THRESHOLD, synthesize_gemini, synthesize_gemini_batch
-
-        all_short = all(len(t.strip()) < SHORT_TEXT_THRESHOLD for t in texts)
-        if all_short and len(texts) > 1:
-            return synthesize_gemini_batch(
-                texts, voice=voice or "Kore", format=format,
-            )
-        # Fall back to individual calls for longer texts
-        results = []
-        for t in texts:
-            results.append(synthesize_gemini(t, voice=voice or "Kore", format=format))
-        return results
+        return await _batch_gemini(texts, voice=voice, format=format)
 
     sem = asyncio.Semaphore(max_concurrent)
 
@@ -165,3 +162,51 @@ async def synthesize_batch(
             )
 
     return await asyncio.gather(*[_one(t) for t in texts])
+
+
+async def _batch_gemini(
+    texts: list[str],
+    *,
+    voice: str | None = None,
+    format: AudioFormat = AudioFormat.MP3,
+) -> list[SynthesisResult]:
+    """Batch Gemini TTS with smart short-word batching and rate limiting.
+
+    - Short texts (< 8 chars) are batched into single API calls
+    - Long texts are synthesized individually with rate limiting (10 RPM)
+    """
+    from ._gemini import SHORT_TEXT_THRESHOLD, synthesize_gemini, synthesize_gemini_batch
+
+    gemini_voice = voice or "Kore"
+
+    # Separate short and long texts, preserving original indices
+    short_indices = []
+    short_texts = []
+    long_indices = []
+    long_texts = []
+
+    for i, t in enumerate(texts):
+        if len(t.strip()) < SHORT_TEXT_THRESHOLD:
+            short_indices.append(i)
+            short_texts.append(t)
+        else:
+            long_indices.append(i)
+            long_texts.append(t)
+
+    results: list[SynthesisResult | None] = [None] * len(texts)
+
+    # Batch all short texts in one API call
+    if short_texts:
+        short_results = synthesize_gemini_batch(
+            short_texts, voice=gemini_voice, format=format,
+        )
+        for idx, result in zip(short_indices, short_results):
+            results[idx] = result
+
+    # Process long texts sequentially with rate limiting (10 RPM = 6s between)
+    for i, (idx, t) in enumerate(zip(long_indices, long_texts)):
+        if i > 0:
+            await asyncio.sleep(6)  # Gemini TTS: 10 RPM limit
+        results[idx] = synthesize_gemini(t, voice=gemini_voice, format=format)
+
+    return results  # type: ignore[return-value]
