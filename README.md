@@ -11,9 +11,33 @@ pip install -e .
 pip install -e ".[gemini]"
 ```
 
-Requires Google Cloud credentials (`gcloud auth application-default login`) and the Text-to-Speech API enabled.
+Requires ffmpeg on PATH (for MP3 conversion) and one of:
+- **ADC**: `gcloud auth application-default login` (default)
+- **API key**: set `GOOGLE_CLOUD_TTS_API_KEY` env var or pass `api_key=` parameter
 
-## Usage
+## CLI
+
+```bash
+# Synthesize text to a file
+tts-tools synthesize "hello world" -l en-US -o hello.mp3
+
+# Use an API key instead of ADC
+tts-tools synthesize "হ্যালো" -l bn-IN --api-key YOUR_KEY -o hello.mp3
+
+# Use Gemini TTS (requires GOOGLE_API_KEY env var)
+tts-tools synthesize "hello" -l en-US --engine gemini -o hello.mp3
+
+# Get JSON metadata (for piping to other tools / agents)
+tts-tools synthesize "hello" -l en-US -o hello.mp3 --json-output
+
+# List available voices
+tts-tools voices -l bn-IN
+tts-tools voices -l en-US --json | jq '.[].name'
+```
+
+Run `tts-tools --help`, `tts-tools synthesize --help`, or `tts-tools voices --help` for full options.
+
+## Python API
 
 ```python
 from tts_tools import synthesize
@@ -24,12 +48,15 @@ result.save("hello.mp3")
 
 # Pick a voice
 result = synthesize("হ্যালো", language="bn-IN", voice="bn-IN-Chirp3-HD-Kore")
-result.save("hello_bn.mp3")
+
+# With API key (no ADC needed)
+result = synthesize("hello", language="en-US", api_key="YOUR_KEY")
 
 # WAV output, no silence trimming
+from tts_tools import AudioFormat
 result = synthesize("hola", language="es-US", format=AudioFormat.WAV, trim=False)
 
-# Use Gemini TTS
+# Use Gemini TTS (requires GOOGLE_API_KEY env var)
 from tts_tools import Engine
 result = synthesize("hello", language="en-US", engine=Engine.GEMINI)
 ```
@@ -59,20 +86,11 @@ For Gemini TTS, `synthesize_batch` automatically uses the efficient batch-and-sp
 ```python
 from tts_tools import list_voices
 
-# List all Bengali voices (live API query, no hardcoded lists)
+# Live API query (no hardcoded lists)
 voices = list_voices(language="bn-IN")
-for v in voices:
-    print(f"{v.name} ({v.ssml_gender})")
-```
 
-### Audio Validation
-
-```python
-from tts_tools._audio import validate_audio
-
-result = validate_audio(audio_bytes, min_duration=0.3, min_file_size=5000)
-if not result["valid"]:
-    print(result["reason"])  # "Too short (0.12s)", "Silent audio", etc.
+# Works with API key too
+voices = list_voices(language="bn-IN", api_key="YOUR_KEY")
 ```
 
 ### SynthesisResult
@@ -88,17 +106,28 @@ Every call returns a `SynthesisResult` with:
 - `save(path)` - write to file (creates parent dirs)
 - `as_segment()` - get a pydub `AudioSegment` for further processing
 
+### Audio Validation
+
+```python
+from tts_tools._audio import validate_audio
+
+result = validate_audio(audio_bytes, min_duration=0.3, min_file_size=5000)
+if not result["valid"]:
+    print(result["reason"])  # "Too short (0.12s)", "Silent audio", etc.
+```
+
 ## What This Does (and Doesn't Do)
 
 This library handles the ~150 lines of boilerplate you'd otherwise copy between projects:
 
 - **Silence trimming** via librosa (Google Cloud TTS returns variable padding)
 - **Audio validation** (RMS energy, duration, file size checks)
-- **Format conversion** (API returns LINEAR16 PCM; you want MP3)
+- **Format conversion** (API returns LINEAR16 PCM; you want MP3). Requires ffmpeg.
 - **Retry with backoff** for transient API failures
 - **Gemini short-word batching** (Gemini fails on <8 char inputs; batches them with `" ... "` separators)
+- **Dual auth** — ADC or simple API key, your choice
 
-It does NOT include CLI tools, input file parsers, manifest management, or speech-to-text verification. Those are application-level concerns.
+It does NOT include input file parsers, manifest management, or speech-to-text verification. Those are application-level concerns.
 
 ## Development
 

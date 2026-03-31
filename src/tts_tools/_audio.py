@@ -5,10 +5,22 @@ from __future__ import annotations
 import io
 import wave
 
+import shutil
+
 import librosa
 import numpy as np
 import soundfile as sf
 from pydub import AudioSegment
+
+
+def _check_ffmpeg() -> None:
+    """Raise a clear error if ffmpeg is not installed."""
+    if shutil.which("ffmpeg") is None:
+        raise RuntimeError(
+            "ffmpeg is required for MP3 conversion but was not found on PATH. "
+            "Install it with: sudo apt-get install ffmpeg (Linux), "
+            "brew install ffmpeg (macOS), or download from https://ffmpeg.org/"
+        )
 
 
 def trim_silence(samples: np.ndarray, top_db: float = 30.0) -> np.ndarray:
@@ -27,7 +39,8 @@ def samples_to_int16(samples: np.ndarray) -> np.ndarray:
 
 
 def to_mp3(samples: np.ndarray, sample_rate: int, bitrate: str = "192k") -> bytes:
-    """Convert PCM samples to MP3 bytes."""
+    """Convert PCM samples to MP3 bytes. Requires ffmpeg on PATH."""
+    _check_ffmpeg()
     int_samples = samples_to_int16(samples)
     segment = AudioSegment(
         int_samples.tobytes(),

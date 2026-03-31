@@ -40,6 +40,7 @@ def synthesize(
     sample_rate: int = 24000,
     timeout: int = 30,
     max_retries: int = 3,
+    api_key: str | None = None,
 ) -> SynthesisResult:
     """Synthesize speech from text. This is the main entry point.
 
@@ -54,6 +55,8 @@ def synthesize(
         sample_rate: Output sample rate in Hz.
         timeout: API timeout in seconds.
         max_retries: Number of retry attempts on transient failures.
+        api_key: Google Cloud TTS API key. If set, uses REST API instead of ADC.
+                 Can also be set via GOOGLE_CLOUD_TTS_API_KEY env var.
     """
     if engine == Engine.GEMINI:
         from ._gemini import synthesize_gemini
@@ -77,6 +80,7 @@ def synthesize(
         volume_gain_db=volume_gain_db,
         timeout=timeout,
         max_retries=max_retries,
+        api_key=api_key,
     )
 
 
@@ -92,6 +96,7 @@ async def synthesize_async(
     sample_rate: int = 24000,
     timeout: int = 30,
     max_retries: int = 3,
+    api_key: str | None = None,
 ) -> SynthesisResult:
     """Async version of synthesize(). Same arguments."""
     if engine == Engine.GEMINI:
@@ -118,6 +123,7 @@ async def synthesize_async(
         volume_gain_db=volume_gain_db,
         timeout=timeout,
         max_retries=max_retries,
+        api_key=api_key,
     )
 
 
