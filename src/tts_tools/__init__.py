@@ -134,21 +134,21 @@ async def synthesize_batch(
     voice: str | None = None,
     engine: Engine = Engine.GOOGLE_CLOUD,
     format: AudioFormat = AudioFormat.MP3,
-    max_concurrent: int = 10,
+    max_concurrent: int = 50,
     **kwargs,
 ) -> list[SynthesisResult]:
     """Synthesize a batch of texts concurrently.
 
-    Concurrency is controlled by *max_concurrent* (default 10). For Google
-    Cloud TTS this maps well to the standard 300 req/min quota. For Gemini
-    TTS, short texts are automatically batched into a single API call.
+    Concurrency is controlled by *max_concurrent* (default 50). For Google
+    Cloud TTS, 50 concurrent requests stays well within the 300 req/min
+    quota while keeping throughput high. For Gemini TTS, short texts are
+    automatically batched into a single API call.
 
     Args:
         texts: List of texts to synthesize.
         language: BCP-47 language code.
-        max_concurrent: Max parallel requests. For Google Cloud TTS, 10 is a
-            safe default. For Gemini, this is capped at 1 (10 RPM limit) unless
-            using the batch-and-split strategy for short texts.
+        max_concurrent: Max parallel requests. Default 50 for Google Cloud
+            TTS. For Gemini, rate limiting is handled automatically.
     """
     if engine == Engine.GEMINI:
         return await _batch_gemini(texts, voice=voice, format=format)
