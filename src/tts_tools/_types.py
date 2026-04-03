@@ -13,6 +13,7 @@ class Engine(str, Enum):
 
     GOOGLE_CLOUD = "google_cloud"
     GEMINI = "gemini"
+    EDGE = "edge"
 
 
 class AudioFormat(str, Enum):

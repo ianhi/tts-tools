@@ -1,6 +1,6 @@
 # TTS Tools
 
-Thin Python library over Google Cloud TTS and Gemini TTS. Handles silence trimming, audio validation, format conversion, and retries.
+Thin Python library over Google Cloud TTS, Gemini TTS, and Edge TTS. Handles silence trimming, audio validation, format conversion, and retries.
 
 ## Structure
 
@@ -11,6 +11,7 @@ src/tts_tools/
 ├── _audio.py            # trim_silence, validate_audio, to_mp3, to_wav, pcm_to_wav
 ├── _google_cloud.py     # Google Cloud TTS (sync + async)
 ├── _gemini.py           # Gemini TTS with short-word batching
+├── _edge.py             # Edge TTS (free, no API key)
 ├── _voices.py           # list_voices() via live API
 ├── _punctuation.py      # Language-aware sentence stop
 ├── _retry.py            # Retry decorator (sync + async)
@@ -33,4 +34,4 @@ uv run pytest tests/ -o "addopts="
 ## Dependencies
 
 Core: `google-cloud-texttospeech`, `pydub`, `librosa`, `soundfile`, `scipy`
-Optional: `google-genai` (for Gemini engine, install with `pip install -e ".[gemini]"`)
+Optional: `google-genai` (for Gemini engine), `edge-tts` (for Edge engine)

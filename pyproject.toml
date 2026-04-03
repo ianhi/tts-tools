@@ -18,6 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 gemini = ["google-genai>=1.0.0"]
+edge = ["edge-tts>=6.1.0"]
 cli = ["click>=8.1"]
 dev = [
     "pre-commit>=3.0.0",

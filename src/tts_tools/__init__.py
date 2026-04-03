@@ -68,6 +68,18 @@ def synthesize(
             max_retries=max_retries,
         )
 
+    if engine == Engine.EDGE:
+        from ._edge import synthesize_edge
+
+        return synthesize_edge(
+            text,
+            language=language,
+            voice=voice,
+            format=format,
+            trim=trim,
+            max_retries=max_retries,
+        )
+
     from ._google_cloud import synthesize_google_cloud
 
     return synthesize_google_cloud(
@@ -111,6 +123,18 @@ async def synthesize_async(
             ),
         )
 
+    if engine == Engine.EDGE:
+        from ._edge import synthesize_edge_async
+
+        return await synthesize_edge_async(
+            text,
+            language=language,
+            voice=voice,
+            format=format,
+            trim=trim,
+            max_retries=max_retries,
+        )
+
     from ._google_cloud import synthesize_google_cloud_async
 
     return await synthesize_google_cloud_async(
@@ -152,6 +176,19 @@ async def synthesize_batch(
     """
     if engine == Engine.GEMINI:
         return await _batch_gemini(texts, voice=voice, format=format)
+
+    if engine == Engine.EDGE:
+        from ._edge import synthesize_edge_async
+
+        sem = asyncio.Semaphore(max_concurrent)
+
+        async def _one_edge(text: str) -> SynthesisResult:
+            async with sem:
+                return await synthesize_edge_async(
+                    text, language=language, voice=voice, format=format,
+                )
+
+        return await asyncio.gather(*[_one_edge(t) for t in texts])
 
     sem = asyncio.Semaphore(max_concurrent)
 

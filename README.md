@@ -1,19 +1,23 @@
 # tts-tools
 
-Simple, high-quality text-to-speech synthesis. A thin layer over Google Cloud TTS and Gemini TTS that handles silence trimming, audio validation, format conversion, and retries.
+Simple, high-quality text-to-speech synthesis. A thin layer over Google Cloud TTS, Gemini TTS, and Edge TTS that handles silence trimming, audio validation, format conversion, and retries.
 
 ## Install
 
 ```bash
-pip install -e .
+uv sync
 
 # With Gemini TTS support
-pip install -e ".[gemini]"
+uv sync --extra gemini
+
+# With Edge TTS support (free, no API key needed)
+uv sync --extra edge
 ```
 
-Requires ffmpeg on PATH (for MP3 conversion) and one of:
-- **ADC**: `gcloud auth application-default login` (default)
-- **API key**: set `GOOGLE_CLOUD_TTS_API_KEY` env var or pass `api_key=` parameter
+Requires ffmpeg on PATH (for MP3 conversion). Auth depends on engine:
+- **Google Cloud**: ADC (`gcloud auth application-default login`) or API key (`GOOGLE_CLOUD_TTS_API_KEY`)
+- **Gemini**: `GOOGLE_API_KEY` env var
+- **Edge**: No auth required (free)
 
 ## CLI
 
@@ -26,6 +30,9 @@ tts-tools synthesize "হ্যালো" -l bn-IN --api-key YOUR_KEY -o hello.m
 
 # Use Gemini TTS (requires GOOGLE_API_KEY env var)
 tts-tools synthesize "hello" -l en-US --engine gemini -o hello.mp3
+
+# Use Edge TTS (free, no API key)
+tts-tools synthesize "hello" -l en-US --engine edge -o hello.mp3
 
 # Get JSON metadata (for piping to other tools / agents)
 tts-tools synthesize "hello" -l en-US -o hello.mp3 --json-output
@@ -59,6 +66,9 @@ result = synthesize("hola", language="es-US", format=AudioFormat.WAV, trim=False
 # Use Gemini TTS (requires GOOGLE_API_KEY env var)
 from tts_tools import Engine
 result = synthesize("hello", language="en-US", engine=Engine.GEMINI)
+
+# Use Edge TTS (free, no API key)
+result = synthesize("hello", language="en-US", engine=Engine.EDGE)
 ```
 
 ### Async & Batch

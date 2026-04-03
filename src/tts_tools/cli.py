@@ -34,16 +34,17 @@ from . import AudioFormat, Engine, list_voices, synthesize
 @click.group()
 @click.version_option(package_name="tts-tools")
 def main():
-    """tts-tools: Text-to-speech synthesis via Google Cloud TTS and Gemini TTS.
+    """tts-tools: Text-to-speech synthesis via Google Cloud TTS, Gemini TTS, and Edge TTS.
 
     Generates audio files from text with silence trimming, audio validation,
-    and format conversion. Supports two auth modes:
+    and format conversion. Supports two auth modes for Google:
 
     \b
       1. Application Default Credentials (gcloud auth application-default login)
       2. API key (--api-key or GOOGLE_CLOUD_TTS_API_KEY env var)
 
     For Gemini TTS, set GOOGLE_API_KEY env var and use --engine gemini.
+    For Edge TTS, use --engine edge (free, no API key required).
     """
 
 
@@ -52,7 +53,7 @@ def main():
 @click.option("-l", "--language", required=True, help="BCP-47 language code (e.g. en-US, bn-IN, es-US).")
 @click.option("-o", "--output", required=True, type=click.Path(), help="Output file path (e.g. hello.mp3, hello.wav).")
 @click.option("--voice", default=None, help="Voice name (e.g. en-US-Chirp3-HD-Kore). Defaults to {language}-Chirp3-HD-Kore.")
-@click.option("--engine", type=click.Choice(["google_cloud", "gemini"], case_sensitive=False), default="google_cloud", help="TTS engine. 'google_cloud' (default) or 'gemini'.")
+@click.option("--engine", type=click.Choice(["google_cloud", "gemini", "edge"], case_sensitive=False), default="google_cloud", help="TTS engine. 'google_cloud' (default), 'gemini', or 'edge'.")
 @click.option("--format", "fmt", type=click.Choice(["mp3", "wav"], case_sensitive=False), default=None, help="Audio format. Auto-detected from output file extension if not set.")
 @click.option("--api-key", default=None, envvar="GOOGLE_CLOUD_TTS_API_KEY", help="Google Cloud TTS API key (alternative to ADC). Env: GOOGLE_CLOUD_TTS_API_KEY.")
 @click.option("--sample-rate", default=24000, type=int, show_default=True, help="Output sample rate in Hz.")
