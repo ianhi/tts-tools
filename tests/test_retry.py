@@ -1,7 +1,5 @@
 """Tests for retry logic."""
 
-import asyncio
-
 import pytest
 
 from tts_tools._retry import retry_async, retry_sync

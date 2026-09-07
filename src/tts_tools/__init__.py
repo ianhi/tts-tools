@@ -13,9 +13,6 @@ from typing import TYPE_CHECKING
 from ._types import AudioFormat, Engine, SynthesisResult
 from ._voices import VoiceInfo, list_voices
 
-if TYPE_CHECKING:
-    pass
-
 __all__ = [
     "AudioFormat",
     "Engine",
@@ -119,7 +116,10 @@ async def synthesize_async(
         return await loop.run_in_executor(
             None,
             lambda: synthesize_gemini(
-                text, voice=voice or "Kore", format=format, max_retries=max_retries,
+                text,
+                voice=voice or "Kore",
+                format=format,
+                max_retries=max_retries,
             ),
         )
 
@@ -185,7 +185,10 @@ async def synthesize_batch(
         async def _one_edge(text: str) -> SynthesisResult:
             async with sem:
                 return await synthesize_edge_async(
-                    text, language=language, voice=voice, format=format,
+                    text,
+                    language=language,
+                    voice=voice,
+                    format=format,
                 )
 
         return await asyncio.gather(*[_one_edge(t) for t in texts])
@@ -195,7 +198,12 @@ async def synthesize_batch(
     async def _one(text: str) -> SynthesisResult:
         async with sem:
             return await synthesize_async(
-                text, language=language, voice=voice, engine=engine, format=format, **kwargs,
+                text,
+                language=language,
+                voice=voice,
+                engine=engine,
+                format=format,
+                **kwargs,
             )
 
     return await asyncio.gather(*[_one(t) for t in texts])
@@ -235,7 +243,9 @@ async def _batch_gemini(
     # Batch all short texts in one API call
     if short_texts:
         short_results = synthesize_gemini_batch(
-            short_texts, voice=gemini_voice, format=format,
+            short_texts,
+            voice=gemini_voice,
+            format=format,
         )
         for idx, result in zip(short_indices, short_results):
             results[idx] = result
