@@ -44,7 +44,7 @@ class SynthesisResult:
         path.write_bytes(self.audio_bytes)
         return path
 
-    def as_segment(self) -> "AudioSegment":
+    def as_segment(self) -> AudioSegment:
         """Return a pydub AudioSegment for further processing."""
         from pydub import AudioSegment
 

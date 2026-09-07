@@ -50,16 +50,48 @@ def main():
 
 @main.command()
 @click.argument("text")
-@click.option("-l", "--language", required=True, help="BCP-47 language code (e.g. en-US, bn-IN, es-US).")
-@click.option("-o", "--output", required=True, type=click.Path(), help="Output file path (e.g. hello.mp3, hello.wav).")
-@click.option("--voice", default=None, help="Voice name (e.g. en-US-Chirp3-HD-Kore). Defaults to {language}-Chirp3-HD-Kore.")
-@click.option("--engine", type=click.Choice(["google_cloud", "gemini", "edge"], case_sensitive=False), default="google_cloud", help="TTS engine. 'google_cloud' (default), 'gemini', or 'edge'.")
-@click.option("--format", "fmt", type=click.Choice(["mp3", "wav"], case_sensitive=False), default=None, help="Audio format. Auto-detected from output file extension if not set.")
-@click.option("--api-key", default=None, envvar="GOOGLE_CLOUD_TTS_API_KEY", help="Google Cloud TTS API key (alternative to ADC). Env: GOOGLE_CLOUD_TTS_API_KEY.")
-@click.option("--sample-rate", default=24000, type=int, show_default=True, help="Output sample rate in Hz.")
+@click.option(
+    "-l", "--language", required=True, help="BCP-47 language code (e.g. en-US, bn-IN, es-US)."
+)
+@click.option(
+    "-o",
+    "--output",
+    required=True,
+    type=click.Path(),
+    help="Output file path (e.g. hello.mp3, hello.wav).",
+)
+@click.option(
+    "--voice",
+    default=None,
+    help="Voice name (e.g. en-US-Chirp3-HD-Kore). Defaults to {language}-Chirp3-HD-Kore.",
+)
+@click.option(
+    "--engine",
+    type=click.Choice(["google_cloud", "gemini", "edge"], case_sensitive=False),
+    default="google_cloud",
+    help="TTS engine. 'google_cloud' (default), 'gemini', or 'edge'.",
+)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(["mp3", "wav"], case_sensitive=False),
+    default=None,
+    help="Audio format. Auto-detected from output file extension if not set.",
+)
+@click.option(
+    "--api-key",
+    default=None,
+    envvar="GOOGLE_CLOUD_TTS_API_KEY",
+    help="Google Cloud TTS API key (alternative to ADC). Env: GOOGLE_CLOUD_TTS_API_KEY.",
+)
+@click.option(
+    "--sample-rate", default=24000, type=int, show_default=True, help="Output sample rate in Hz."
+)
 @click.option("--no-trim", is_flag=True, help="Disable silence trimming.")
 @click.option("--json-output", is_flag=True, help="Print result metadata as JSON to stdout.")
-def synthesize_cmd(text, language, output, voice, engine, fmt, api_key, sample_rate, no_trim, json_output):
+def synthesize_cmd(
+    text, language, output, voice, engine, fmt, api_key, sample_rate, no_trim, json_output
+):
     """Synthesize TEXT to an audio file.
 
     \b
@@ -86,22 +118,38 @@ def synthesize_cmd(text, language, output, voice, engine, fmt, api_key, sample_r
     path = result.save(output)
 
     if json_output:
-        print(json.dumps({
-            "path": str(path),
-            "format": result.format.value,
-            "duration": round(result.duration, 3),
-            "file_size": result.file_size,
-            "sample_rate": result.sample_rate,
-            "text": result.text,
-        }))
+        print(
+            json.dumps(
+                {
+                    "path": str(path),
+                    "format": result.format.value,
+                    "duration": round(result.duration, 3),
+                    "file_size": result.file_size,
+                    "sample_rate": result.sample_rate,
+                    "text": result.text,
+                }
+            )
+        )
     else:
-        click.echo(f"Saved {result.format.value} ({result.duration:.2f}s, {result.file_size:,} bytes) → {path}", err=True)
+        click.echo(
+            f"Saved {result.format.value} ({result.duration:.2f}s, {result.file_size:,} bytes) → {path}",
+            err=True,
+        )
 
 
 @main.command()
-@click.option("-l", "--language", default=None, help="Filter voices by BCP-47 language code (e.g. bn-IN).")
-@click.option("--api-key", default=None, envvar="GOOGLE_CLOUD_TTS_API_KEY", help="Google Cloud TTS API key. Env: GOOGLE_CLOUD_TTS_API_KEY.")
-@click.option("--json", "as_json", is_flag=True, help="Output as JSON array (for piping to jq, scripts, etc).")
+@click.option(
+    "-l", "--language", default=None, help="Filter voices by BCP-47 language code (e.g. bn-IN)."
+)
+@click.option(
+    "--api-key",
+    default=None,
+    envvar="GOOGLE_CLOUD_TTS_API_KEY",
+    help="Google Cloud TTS API key. Env: GOOGLE_CLOUD_TTS_API_KEY.",
+)
+@click.option(
+    "--json", "as_json", is_flag=True, help="Output as JSON array (for piping to jq, scripts, etc)."
+)
 def voices(language, api_key, as_json):
     """List available Google Cloud TTS voices.
 
@@ -114,15 +162,20 @@ def voices(language, api_key, as_json):
     results = list_voices(language, api_key=api_key)
 
     if as_json:
-        print(json.dumps([
-            {
-                "name": v.name,
-                "language_codes": v.language_codes,
-                "gender": v.ssml_gender,
-                "sample_rate": v.natural_sample_rate,
-            }
-            for v in results
-        ], indent=2))
+        print(
+            json.dumps(
+                [
+                    {
+                        "name": v.name,
+                        "language_codes": v.language_codes,
+                        "gender": v.ssml_gender,
+                        "sample_rate": v.natural_sample_rate,
+                    }
+                    for v in results
+                ],
+                indent=2,
+            )
+        )
     else:
         if not results:
             click.echo("No voices found.", err=True)
