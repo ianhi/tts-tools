@@ -53,12 +53,23 @@ def synthesize_google_cloud(
 
     if key:
         raw_wav = retry_sync(
-            lambda: _rest_synthesize(text, language, voice_name, sample_rate, volume_gain_db, effects_profile_id, key, timeout),
+            lambda: _rest_synthesize(
+                text,
+                language,
+                voice_name,
+                sample_rate,
+                volume_gain_db,
+                effects_profile_id,
+                key,
+                timeout,
+            ),
             max_retries=max_retries,
         )
     else:
         raw_wav = retry_sync(
-            lambda: _sdk_synthesize(text, language, voice_name, sample_rate, volume_gain_db, effects_profile_id, timeout),
+            lambda: _sdk_synthesize(
+                text, language, voice_name, sample_rate, volume_gain_db, effects_profile_id, timeout
+            ),
             max_retries=max_retries,
         )
     return _process_raw(raw_wav, text=text, format=format, trim=trim)
@@ -93,10 +104,20 @@ async def synthesize_google_cloud_async(
 
     if key:
         raw_wav = await retry_async(
-            lambda: _async_rest_synthesize(text, language, voice_name, sample_rate, volume_gain_db, effects_profile_id, key, timeout),
+            lambda: _async_rest_synthesize(
+                text,
+                language,
+                voice_name,
+                sample_rate,
+                volume_gain_db,
+                effects_profile_id,
+                key,
+                timeout,
+            ),
             max_retries=max_retries,
         )
     else:
+
         async def _call():
             from google.cloud import texttospeech_v1
 
@@ -106,7 +127,8 @@ async def synthesize_google_cloud_async(
                     request={
                         "input": texttospeech_v1.SynthesisInput(text=text),
                         "voice": texttospeech_v1.VoiceSelectionParams(
-                            language_code=language, name=voice_name,
+                            language_code=language,
+                            name=voice_name,
                         ),
                         "audio_config": texttospeech_v1.AudioConfig(
                             audio_encoding=texttospeech_v1.AudioEncoding.LINEAR16,
@@ -145,7 +167,8 @@ def _sdk_synthesize(
         request={
             "input": texttospeech.SynthesisInput(text=text),
             "voice": texttospeech.VoiceSelectionParams(
-                language_code=language, name=voice_name,
+                language_code=language,
+                name=voice_name,
             ),
             "audio_config": texttospeech.AudioConfig(
                 audio_encoding=texttospeech.AudioEncoding.LINEAR16,
@@ -219,7 +242,9 @@ async def _async_rest_synthesize(
         payload["audioConfig"]["effectsProfileId"] = [effects_profile_id]
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(CLOUD_TTS_URL, params={"key": api_key}, json=payload, timeout=timeout)
+        resp = await client.post(
+            CLOUD_TTS_URL, params={"key": api_key}, json=payload, timeout=timeout
+        )
     resp.raise_for_status()
     pcm_data = base64.b64decode(resp.json()["audioContent"])
     return pcm_to_wav(pcm_data, sample_rate=sample_rate)
