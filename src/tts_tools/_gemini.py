@@ -133,9 +133,7 @@ def synthesize_gemini_batch(
     return [_wav_to_result(chunk, text=t, format=format) for t, chunk in zip(texts, chunks)]
 
 
-def _wav_to_result(
-    wav_bytes: bytes, *, text: str, format: AudioFormat
-) -> SynthesisResult:
+def _wav_to_result(wav_bytes: bytes, *, text: str, format: AudioFormat) -> SynthesisResult:
     """Convert WAV bytes to a SynthesisResult, optionally converting to MP3."""
     import soundfile as sf
 
