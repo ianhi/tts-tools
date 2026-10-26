@@ -61,10 +61,12 @@ result = synthesize("hello", language="en-US", api_key="YOUR_KEY")
 
 # WAV output, no silence trimming
 from tts_tools import AudioFormat
+
 result = synthesize("hola", language="es-US", format=AudioFormat.WAV, trim=False)
 
 # Use Gemini TTS (requires GOOGLE_API_KEY env var)
 from tts_tools import Engine
+
 result = synthesize("hello", language="en-US", engine=Engine.GEMINI)
 
 # Use Edge TTS (free, no API key)
