@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import io
-import wave
-
 import shutil
+import wave
 
 import librosa
 import numpy as np
@@ -92,7 +91,12 @@ def validate_audio(
     """
     size = len(audio_bytes)
     if size < min_file_size:
-        return {"valid": False, "reason": f"Too small ({size} bytes)", "duration": 0, "file_size": size}
+        return {
+            "valid": False,
+            "reason": f"Too small ({size} bytes)",
+            "duration": 0,
+            "file_size": size,
+        }
 
     try:
         data, sr = sf.read(io.BytesIO(audio_bytes))
@@ -101,11 +105,21 @@ def validate_audio(
         return {"valid": False, "reason": f"Unreadable: {e}", "duration": 0, "file_size": size}
 
     if duration < min_duration:
-        return {"valid": False, "reason": f"Too short ({duration:.2f}s)", "duration": duration, "file_size": size}
+        return {
+            "valid": False,
+            "reason": f"Too short ({duration:.2f}s)",
+            "duration": duration,
+            "file_size": size,
+        }
 
     if len(data) > 0:
         rms = float((data**2).mean() ** 0.5)
         if rms < 1e-6:
-            return {"valid": False, "reason": "Silent audio", "duration": duration, "file_size": size}
+            return {
+                "valid": False,
+                "reason": "Silent audio",
+                "duration": duration,
+                "file_size": size,
+            }
 
     return {"valid": True, "reason": "OK", "duration": duration, "file_size": size}

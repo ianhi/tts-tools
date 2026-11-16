@@ -31,7 +31,7 @@ def _default_voice(language: str) -> str:
     if language in defaults:
         return defaults[language]
     # Fallback: try constructing a plausible name
-    return f"{language}-AriaNeural" if language.startswith("en") else f"en-US-AriaNeural"
+    return f"{language}-AriaNeural" if language.startswith("en") else "en-US-AriaNeural"
 
 
 async def _edge_tts_request(text: str, voice: str) -> bytes:
@@ -40,8 +40,7 @@ async def _edge_tts_request(text: str, voice: str) -> bytes:
         import edge_tts
     except ImportError:
         raise ImportError(
-            "Edge TTS requires the edge-tts package. "
-            "Install it with: pip install tts-tools[edge]"
+            "Edge TTS requires the edge-tts package. Install it with: pip install tts-tools[edge]"
         ) from None
 
     communicate = edge_tts.Communicate(text, voice)
@@ -105,8 +104,9 @@ def _mp3_to_result(
     segment = AudioSegment.from_mp3(io.BytesIO(mp3_bytes))
 
     if trim:
-        from ._audio import trim_silence
         import numpy as np
+
+        from ._audio import trim_silence
 
         samples = np.array(segment.get_array_of_samples(), dtype=np.int16)
         samples = trim_silence(samples)
